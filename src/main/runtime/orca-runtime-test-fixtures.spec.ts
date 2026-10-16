@@ -10,6 +10,7 @@ import {
 import { getDefaultWorkspaceSession } from '../../shared/constants'
 import { makePaneKey } from '../../shared/stable-pane-id'
 import { toComparableRelaySshPtyId } from '../../shared/ssh-pty-id'
+import { ptySpawnPaneFromIds, stampPtySpawnPaneEnv } from '../ipc/pty/spawn-pane-env'
 import {
   computeWorktreePathMock,
   ensurePathWithinWorkspaceMock
@@ -251,6 +252,23 @@ function expectStablePaneKeyEnv(env: Record<string, string>): string {
   expect(leafId).toMatch(UUID_RE)
   expect(env.ORCA_PANE_KEY).toBe(`${env.ORCA_TAB_ID}:${leafId}`)
   return env.ORCA_PANE_KEY
+}
+
+/** The PTY env once the spawn step stamps the call's own pane ids, as the real controller does. */
+function spawnedPtyEnv(
+  call:
+    | { env?: Record<string, string>; tabId?: string; leafId?: string; worktreeId?: string }
+    | undefined
+): Record<string, string> {
+  const env = { ...call?.env }
+  stampPtySpawnPaneEnv(env, {
+    pane: call ? ptySpawnPaneFromIds(call) : null,
+    isDaemonHostSpawn: false,
+    launchAgent: undefined,
+    cwd: undefined,
+    prewarmsJcodeOnDaemonHost: false
+  })
+  return env
 }
 
 function createRuntime(): RuntimeService {
@@ -687,5 +705,5 @@ export { makeDeferred, makeFolderProjectGroup, makeFolderWorkspace, makeHeadless
 export { makeRpcRequest, makeRuntimeStoreWithWorkspaceSession, makeStatusFrame }
 export { makeWorkspaceSessionWithHeadlessTerminal, makeWorktreeInfo, makeWorktreeMeta }
 export { parseHeadlessSnapshotLines, pendingMailPointerRepoints, referenceStatusFrameLines }
-export { renderGateCapMs, setInMemoryOrchestrationMessages, store, syncSinglePty }
+export { renderGateCapMs, setInMemoryOrchestrationMessages, spawnedPtyEnv, store, syncSinglePty }
 export { visibleNonEmptyLines, withPlatform, writeHeadless }

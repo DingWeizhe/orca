@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AgentHookServer } from '../agent-hooks/server'
+import { ptySpawnPaneFromIds } from '../ipc/pty/spawn-pane-env'
 import { OrcaRuntimeService } from './orca-runtime'
 import { makeStore } from './runtime-rpc-worktree-store-fixtures'
 
@@ -76,9 +77,12 @@ async function launchOpenCodePane(options: {
     launchConfig: { agentCommand: 'opencode', agentArgs: '', agentEnv: {} },
     launchAgent: 'opencode'
   })
-  const env = (spawn.mock.calls[0]?.[0] as { env?: Record<string, string> } | undefined)?.env ?? {}
-  const paneKey = env.ORCA_PANE_KEY as string
-  const launchToken = env.ORCA_AGENT_LAUNCH_TOKEN as string
+  const call = spawn.mock.calls[0]?.[0] as
+    | { env?: Record<string, string>; tabId?: string; leafId?: string }
+    | undefined
+  // Why: the real spawn step stamps ORCA_PANE_KEY from the call's own ids; this fake skips it.
+  const paneKey = (call && ptySpawnPaneFromIds(call)?.paneKey) ?? ''
+  const launchToken = call?.env?.ORCA_AGENT_LAUNCH_TOKEN as string
   expect(paneKey).toBeTruthy()
   expect(launchToken).toBeTruthy()
   return {
