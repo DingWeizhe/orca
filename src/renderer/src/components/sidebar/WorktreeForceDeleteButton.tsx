@@ -1,4 +1,4 @@
-import { useState, type ReactNode, type Ref } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
@@ -11,6 +11,13 @@ import {
   DropdownMenuTrigger
 } from '../ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
+
+function isHiddenInToastStack(toastElement: Element): boolean {
+  return (
+    toastElement.getAttribute('data-expanded') === 'false' &&
+    toastElement.getAttribute('data-front') === 'false'
+  )
+}
 
 export function WorktreeForceDeleteButton({
   toastId,
@@ -42,6 +49,22 @@ export function WorktreeForceDeleteButton({
   children?: ReactNode
 }): React.JSX.Element {
   const [isSaving, setIsSaving] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const groupRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const toastElement = menuOpen ? groupRef.current?.closest('[data-sonner-toast]') : null
+    if (!toastElement) {
+      return
+    }
+    // Why: a collapsed toast stack hides this toast, but its portaled menu would stay open over the app.
+    const observer = new MutationObserver(() => {
+      if (isHiddenInToastStack(toastElement)) {
+        setMenuOpen(false)
+      }
+    })
+    observer.observe(toastElement, { attributeFilter: ['data-expanded', 'data-front'] })
+    return () => observer.disconnect()
+  }, [menuOpen])
   const forceDelete = (): void => {
     if (toastId) {
       toast.dismiss(toastId)
@@ -70,8 +93,9 @@ export function WorktreeForceDeleteButton({
   }
 
   return (
-    <DropdownMenu modal={false}>
+    <DropdownMenu modal={false} open={menuOpen} onOpenChange={setMenuOpen}>
       <ButtonGroup
+        ref={groupRef}
         className={fullWidth ? 'w-full' : undefined}
         onBlur={(event) => {
           if (

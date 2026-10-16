@@ -38,6 +38,9 @@ function renderRecovery(onAlwaysForceDelete: () => Promise<void>, canForceDelete
     root?.render(
       <TooltipProvider delayDuration={0}>
         <div
+          data-sonner-toast=""
+          data-expanded="true"
+          data-front="false"
           onBlur={(event) => {
             if (!event.currentTarget.contains(event.relatedTarget)) {
               onOutsideBlur()
@@ -107,6 +110,23 @@ it('keeps portaled menu focus from triggering toast focus restoration', async ()
   await act(async () => item.focus())
   expect(onOutsideBlur).not.toHaveBeenCalled()
   expect(document.querySelector('[role="menu"]')).not.toBeNull()
+})
+
+it('closes the menu when the toast stack collapses and hides its toast', async () => {
+  const { container } = renderRecovery(vi.fn())
+  const trigger = container.querySelector('button[aria-label="More force delete options"]')
+  if (!(trigger instanceof HTMLElement)) {
+    throw new Error('Missing dropdown trigger')
+  }
+  await act(async () => {
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+  })
+  expect(document.querySelector('[role="menu"]')).not.toBeNull()
+
+  await act(async () => {
+    container.querySelector('[data-sonner-toast]')?.setAttribute('data-expanded', 'false')
+  })
+  expect(document.querySelector('[role="menu"]')).toBeNull()
 })
 
 it('waits for the preference to persist before force-deleting and dismissing', async () => {
