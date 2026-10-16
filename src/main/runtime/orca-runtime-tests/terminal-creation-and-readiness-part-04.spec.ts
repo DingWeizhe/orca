@@ -206,9 +206,7 @@ describe('OrcaRuntimeService', () => {
       }
     })
 
-    const spawnedEnv = spawnedPtyEnv(
-      spawn.mock.calls[0]?.[0] as Parameters<typeof spawnedPtyEnv>[0]
-    )
+    const spawnedEnv = spawnedPtyEnv(spawn.mock.calls[0]?.[0])
     expect(spawnedEnv.ORCA_TAB_ID).toBe(tabId)
     expect(spawnedEnv.ORCA_PANE_KEY).toBe(`${tabId}:${leafId}`)
   })
@@ -231,9 +229,7 @@ describe('OrcaRuntimeService', () => {
       leafId
     })
 
-    const spawnedEnv = spawnedPtyEnv(
-      spawn.mock.calls[0]?.[0] as Parameters<typeof spawnedPtyEnv>[0]
-    )
+    const spawnedEnv = spawnedPtyEnv(spawn.mock.calls[0]?.[0])
     expect(spawnedEnv.ORCA_TAB_ID).not.toBe(tabId)
     expect(spawnedEnv.ORCA_TAB_ID).not.toMatch(/^web-terminal-/)
     expect(spawnedEnv.ORCA_PANE_KEY).toMatch(`${spawnedEnv.ORCA_TAB_ID}:`)

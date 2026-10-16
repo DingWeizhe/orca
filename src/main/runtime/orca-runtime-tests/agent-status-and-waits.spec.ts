@@ -27,9 +27,7 @@ describe('OrcaRuntimeService', () => {
       command: 'codex',
       title: 'worker'
     })
-    const spawnedEnv = spawnedPtyEnv(
-      spawn.mock.calls[0]?.[0] as Parameters<typeof spawnedPtyEnv>[0]
-    )
+    const spawnedEnv = spawnedPtyEnv(spawn.mock.calls[0]?.[0])
     const paneKey = expectStablePaneKeyEnv(spawnedEnv)
 
     runtime.onPtyData('pty-bg', 'before\x1b]999', 123)

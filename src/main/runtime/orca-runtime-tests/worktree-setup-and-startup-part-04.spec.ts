@@ -355,8 +355,8 @@ describe('OrcaRuntimeService', () => {
     expect(setupCommand).toContain(`${nonceMatch![1]} "$status"`)
     expect(startupScript).toContain(markerPath)
     expect(setupCommand).toContain(markerPath)
-    const mainEnv = spawnedPtyEnv(spawn.mock.calls[0]![0] as Parameters<typeof spawnedPtyEnv>[0])
-    const setupEnv = spawnedPtyEnv(spawn.mock.calls[1]![0] as Parameters<typeof spawnedPtyEnv>[0])
+    const mainEnv = spawnedPtyEnv(spawn.mock.calls[0]![0])
+    const setupEnv = spawnedPtyEnv(spawn.mock.calls[1]![0])
     expect(result.setup).toBeUndefined()
     expect(result.setupReceipt).toMatchObject({
       state: 'running',

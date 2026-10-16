@@ -353,9 +353,7 @@ describe('OrcaRuntimeService', () => {
         worktreeId: result.worktree.id
       })
     )
-    const setupSpawnEnv = spawnedPtyEnv(
-      spawn.mock.calls[1]?.[0] as Parameters<typeof spawnedPtyEnv>[0]
-    )
+    const setupSpawnEnv = spawnedPtyEnv(spawn.mock.calls[1]?.[0])
     expectStablePaneKeyEnv(setupSpawnEnv)
     const setupLeafId = setupSpawnEnv.ORCA_PANE_KEY.slice(`${setupSpawnEnv.ORCA_TAB_ID}:`.length)
     // Why: a background CLI create adopts its tabs silently — surfaceOwner:false

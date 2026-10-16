@@ -78,9 +78,7 @@ describe('OrcaRuntimeService', () => {
     expect(result.handle).toMatch(/^term_/)
     expect(createTerminal).not.toHaveBeenCalled()
     // Why: agent status keys off `${tabId}:${leafId}`; main pre-allocates the tabId, env-stamps it before spawn, and reuses it for adoption.
-    const spawnedEnv = spawnedPtyEnv(
-      spawn.mock.calls[0]?.[0] as Parameters<typeof spawnedPtyEnv>[0]
-    )
+    const spawnedEnv = spawnedPtyEnv(spawn.mock.calls[0]?.[0])
     expectStablePaneKeyEnv(spawnedEnv)
     const spawnedLeafId = spawnedEnv.ORCA_PANE_KEY.slice(`${spawnedEnv.ORCA_TAB_ID}:`.length)
     expect(spawnedEnv.ORCA_WORKTREE_ID).toBe(TEST_WORKTREE_ID)
@@ -270,7 +268,7 @@ describe('OrcaRuntimeService', () => {
       launchAgent: 'codex',
       launchConfig: { agentCommand: 'codex', agentArgs: '', agentEnv: {} }
     })
-    const spawnEnv = spawnedPtyEnv(spawn.mock.calls[0]?.[0] as Parameters<typeof spawnedPtyEnv>[0])
+    const spawnEnv = spawnedPtyEnv(spawn.mock.calls[0]?.[0])
     const evidence = {
       terminalHandle: terminal.handle,
       paneKey: spawnEnv.ORCA_PANE_KEY,

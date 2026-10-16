@@ -327,9 +327,7 @@ describe('OrcaRuntimeService', () => {
         preAllocatedHandle: expect.stringMatching(/^term_/)
       })
     )
-    const initialSpawnEnv = spawnedPtyEnv(
-      spawn.mock.calls[0]?.[0] as Parameters<typeof spawnedPtyEnv>[0]
-    )
+    const initialSpawnEnv = spawnedPtyEnv(spawn.mock.calls[0]?.[0])
     expectStablePaneKeyEnv(initialSpawnEnv)
     const initialLeafId = initialSpawnEnv.ORCA_PANE_KEY.slice(
       `${initialSpawnEnv.ORCA_TAB_ID}:`.length
@@ -592,8 +590,8 @@ describe('OrcaRuntimeService', () => {
 
     expect(activateWorktree).not.toHaveBeenCalled()
     await vi.waitFor(() => expect(spawn).toHaveBeenCalledTimes(2))
-    const mainEnv = spawnedPtyEnv(spawn.mock.calls[0]![0] as Parameters<typeof spawnedPtyEnv>[0])
-    const setupEnv = spawnedPtyEnv(spawn.mock.calls[1]![0] as Parameters<typeof spawnedPtyEnv>[0])
+    const mainEnv = spawnedPtyEnv(spawn.mock.calls[0]![0])
+    const setupEnv = spawnedPtyEnv(spawn.mock.calls[1]![0])
     expectStablePaneKeyEnv(mainEnv)
     expectStablePaneKeyEnv(setupEnv)
     expect(setupEnv.ORCA_TAB_ID).not.toBe(mainEnv.ORCA_TAB_ID)

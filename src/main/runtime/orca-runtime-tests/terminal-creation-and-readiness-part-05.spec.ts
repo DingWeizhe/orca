@@ -144,7 +144,7 @@ describe('OrcaRuntimeService', () => {
     runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
 
     const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`)
-    const sourceEnv = spawnedPtyEnv(spawn.mock.calls[0]?.[0] as Parameters<typeof spawnedPtyEnv>[0])
+    const sourceEnv = spawnedPtyEnv(spawn.mock.calls[0]?.[0])
     const sourceLeafId = sourceEnv.ORCA_PANE_KEY.slice(`${sourceEnv.ORCA_TAB_ID}:`.length)
 
     const split = await runtime.splitTerminal(handle, { direction: 'vertical' })
@@ -154,7 +154,7 @@ describe('OrcaRuntimeService', () => {
       paneRuntimeId: -1
     })
 
-    const splitEnv = spawnedPtyEnv(spawn.mock.calls[1]?.[0] as Parameters<typeof spawnedPtyEnv>[0])
+    const splitEnv = spawnedPtyEnv(spawn.mock.calls[1]?.[0])
     const splitLeafId = splitEnv.ORCA_PANE_KEY.slice(`${sourceEnv.ORCA_TAB_ID}:`.length)
     expect(split.leafId).toBe(splitLeafId)
     expect(splitTerminal).not.toHaveBeenCalled()

@@ -89,7 +89,7 @@ describe('OrcaRuntimeService', () => {
 
     expect(activateWorktree).not.toHaveBeenCalled()
     await vi.waitFor(() => expect(spawn).toHaveBeenCalledTimes(2))
-    const mainEnv = spawnedPtyEnv(spawn.mock.calls[0]![0] as Parameters<typeof spawnedPtyEnv>[0])
+    const mainEnv = spawnedPtyEnv(spawn.mock.calls[0]![0])
     await vi.waitFor(() =>
       expect(revealTerminalSession).toHaveBeenLastCalledWith(
         result.worktree.id,
