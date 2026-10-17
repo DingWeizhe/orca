@@ -1,4 +1,4 @@
-import { act, createElement } from 'react'
+import { act, createElement, useLayoutEffect } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { NativeChatAttachmentOwner } from './native-chat-attachment-upload'
 import { useNativeChatComposerPaste } from './use-native-chat-composer-paste'
@@ -68,7 +68,8 @@ type ProbeArgs = {
 }
 
 function Probe({ onReady, ...args }: ProbeArgs): null {
-  onReady(useNativeChatComposerPaste({ agent: 'claude', caret: 0, setCaret: () => {}, ...args }))
+  const api = useNativeChatComposerPaste({ agent: 'claude', caret: 0, setCaret: () => {}, ...args })
+  useLayoutEffect(() => onReady(api))
   return null
 }
 
