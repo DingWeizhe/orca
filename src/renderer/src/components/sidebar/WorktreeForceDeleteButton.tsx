@@ -12,10 +12,12 @@ import {
 } from '../ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 
+// Why: Sonner hides a toast either behind a collapsed stack or past its visible-toast limit.
 function isHiddenInToastStack(toastElement: Element): boolean {
   return (
-    toastElement.getAttribute('data-expanded') === 'false' &&
-    toastElement.getAttribute('data-front') === 'false'
+    toastElement.getAttribute('data-visible') === 'false' ||
+    (toastElement.getAttribute('data-expanded') === 'false' &&
+      toastElement.getAttribute('data-front') === 'false')
   )
 }
 
@@ -51,18 +53,24 @@ export function WorktreeForceDeleteButton({
   const [isSaving, setIsSaving] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const groupRef = useRef<HTMLDivElement>(null)
+  const isToastHidden = (): boolean => {
+    const toastElement = groupRef.current?.closest('[data-sonner-toast]')
+    return toastElement ? isHiddenInToastStack(toastElement) : false
+  }
   useEffect(() => {
     const toastElement = menuOpen ? groupRef.current?.closest('[data-sonner-toast]') : null
     if (!toastElement) {
       return
     }
-    // Why: a collapsed toast stack hides this toast, but its portaled menu would stay open over the app.
+    // Why: Sonner can hide this toast while its portaled menu would stay open over the app.
     const observer = new MutationObserver(() => {
       if (isHiddenInToastStack(toastElement)) {
         setMenuOpen(false)
       }
     })
-    observer.observe(toastElement, { attributeFilter: ['data-expanded', 'data-front'] })
+    observer.observe(toastElement, {
+      attributeFilter: ['data-expanded', 'data-front', 'data-visible']
+    })
     return () => observer.disconnect()
   }, [menuOpen])
   const forceDelete = (): void => {
@@ -93,7 +101,16 @@ export function WorktreeForceDeleteButton({
   }
 
   return (
-    <DropdownMenu modal={false} open={menuOpen} onOpenChange={setMenuOpen}>
+    <DropdownMenu
+      modal={false}
+      open={menuOpen}
+      onOpenChange={(open) => {
+        // Why: a hidden toast's chevron still takes keys, but its menu would float over the app.
+        if (!open || !isToastHidden()) {
+          setMenuOpen(open)
+        }
+      }}
+    >
       <ButtonGroup
         ref={groupRef}
         className={fullWidth ? 'w-full' : undefined}
@@ -142,6 +159,12 @@ export function WorktreeForceDeleteButton({
           // Sonner restores toast focus on blur; the portaled menu owns its focus.
           onFocus={(event) => event.stopPropagation()}
           onBlur={(event) => event.stopPropagation()}
+          onCloseAutoFocus={(event) => {
+            // Why: focus left on a hidden toast's chevron makes keys act on an invisible control.
+            if (isToastHidden()) {
+              event.preventDefault()
+            }
+          }}
         >
           <Tooltip>
             <TooltipTrigger asChild>

@@ -112,20 +112,31 @@ it('keeps portaled menu focus from triggering toast focus restoration', async ()
   expect(document.querySelector('[role="menu"]')).not.toBeNull()
 })
 
-it('closes the menu when the toast stack collapses and hides its toast', async () => {
+it('keeps the menu shut and unfocused while the toast stack hides its toast', async () => {
   const { container } = renderRecovery(vi.fn())
   const trigger = container.querySelector('button[aria-label="More force delete options"]')
   if (!(trigger instanceof HTMLElement)) {
     throw new Error('Missing dropdown trigger')
   }
-  await act(async () => {
-    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
-  })
+  const pressArrowDown = (): Promise<void> =>
+    act(async () => {
+      trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+    })
+  await act(async () => trigger.focus())
+  await pressArrowDown()
   expect(document.querySelector('[role="menu"]')).not.toBeNull()
 
   await act(async () => {
     container.querySelector('[data-sonner-toast]')?.setAttribute('data-expanded', 'false')
   })
+  await act(async () => {
+    // Radix returns focus after close in a timeout.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+  expect(document.querySelector('[role="menu"]')).toBeNull()
+  expect(document.activeElement).not.toBe(trigger)
+
+  await pressArrowDown()
   expect(document.querySelector('[role="menu"]')).toBeNull()
 })
 
