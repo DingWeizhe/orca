@@ -18,6 +18,9 @@ export type AgentSessionPublishedWork = Pick<
   | 'actionablePrompts'
   | 'working'
   | 'viewKey'
+  | 'workViewKey'
+  | 'publishedSubmission'
+  | 'restatedSubmissions'
   | 'requestProjection'
 >
 
@@ -47,12 +50,24 @@ export function agentSessionPublishedWorkFields(
 }
 
 /** A page as the host publishes it: its turn record scoped by the projection, an ended
- *  generation's turn running nowhere. */
+ *  generation's turn running nowhere, and every unanswered send as the projection reads it, on the
+ *  page or not, which a client replaces by id. */
 export function withPublishedWork(
   page: AgentSessionHistoryPage,
   work: AgentSessionPublishedWork | undefined
 ): AgentSessionHistoryPage {
-  return work ? { ...page, ...publishedWorkFields(page.latestTurn, work) } : page
+  if (!work) {
+    return page
+  }
+  const onPage = new Set(page.submissions.map((submission) => submission.clientMessageId))
+  return {
+    ...page,
+    ...publishedWorkFields(page.latestTurn, work),
+    submissions: [
+      ...page.submissions.map(work.publishedSubmission),
+      ...work.restatedSubmissions().filter((submission) => !onPage.has(submission.clientMessageId))
+    ]
+  }
 }
 
 export function withPublishedWorkResult(

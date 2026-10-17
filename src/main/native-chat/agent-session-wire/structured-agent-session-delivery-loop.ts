@@ -80,6 +80,8 @@ export type StructuredAgentSessionDeliveryLoopDeps = {
   record: (sessionId: string) => AgentSessionRecord | null
   /** The host's projection of the chat's current work (`hostStructuredAgentSessionCurrentWork`). */
   currentWork: (sessionId: string) => StructuredAgentSessionCurrentWork | null
+  /** What is current changed with no row (`publishGenerationEnded`). */
+  workChanged?: (sessionId: string) => void
   readChildWork: (sessionId: string) => readonly AgentChildWorkView[] | undefined
   /** A person's Stop is still ending the session's work: the status feed's own reading. */
   stopping: (sessionId: string) => boolean
@@ -288,7 +290,8 @@ export class StructuredAgentSessionDeliveryLoop {
       return this.stop(sessionId)
     }
     // None while a turn is still opening: joining it would record the message ahead of it.
-    const next = structuredAgentSessionNextHandover(session, awaitedChild.fence)
+    const work = this.deps.currentWork(sessionId)
+    const next = structuredAgentSessionNextHandover(session, awaitedChild.fence, work)
     if (!next) {
       return this.stop(sessionId)
     }
@@ -313,7 +316,8 @@ export class StructuredAgentSessionDeliveryLoop {
         failureTextContext: this.deps.failureTextContext(sessionId),
         record: () => this.deps.record(sessionId),
         childWork: () => this.deps.readChildWork(sessionId),
-        now: this.deps.now
+        now: this.deps.now,
+        workChanged: () => this.deps.workChanged?.(sessionId)
       },
       next
     )

@@ -104,7 +104,7 @@ export function deliverToSubscriber(
         ...shared
       })
       subscriber.cursor = page.liveCursor ?? page.window.nextCursor
-      subscriber.workView = work?.viewKey()
+      subscriber.workView = work?.workViewKey()
       return
     }
     const page = result.page
@@ -131,6 +131,7 @@ export function deliverToSubscriber(
         activity: port.activity(subscriber.sessionId)
       })
       subscriber.cursor = tail.liveCursor ?? tail.window.nextCursor
+      subscriber.workView = work?.workViewKey()
       return
     }
     emit(
@@ -158,7 +159,7 @@ export function deliverToSubscriber(
       { withholdQueued: page.hasNewer }
     )
     subscriber.cursor = page.window.nextCursor
-    subscriber.workView = work?.viewKey()
+    subscriber.workView = work?.workViewKey()
     if (!page.hasNewer || !port.isActive(subscriber)) {
       return
     }
@@ -183,7 +184,7 @@ function emitCaughtUp(
   // A generation that ended (or began) with no row, or an exit this host saw with no lease write,
   // changes what is current: the caught-up frame restates the view.
   const { work } = current
-  const workChanged = work !== undefined && work.viewKey() !== subscriber.workView
+  const workChanged = work !== undefined && work.workViewKey() !== subscriber.workView
   if (
     emitCheckpoint ||
     shared.activity !== undefined ||
@@ -196,7 +197,11 @@ function emitCaughtUp(
       {
         type: 'batch',
         sessionId: subscriber.sessionId,
-        batch: emptyAgentSessionBatch(subscriber.cursor),
+        batch: {
+          ...emptyAgentSessionBatch(subscriber.cursor),
+          // What the child holds moved with no row: restated, with the work fields beside it.
+          submissions: workChanged ? work.restatedSubmissions() : []
+        },
         fence: subscriber.fence,
         ...(workChanged ? agentSessionPublishedWorkFields(current.journal, work) : {}),
         ...shared
@@ -204,7 +209,7 @@ function emitCaughtUp(
       { currentWork: work }
     )
     if (workChanged) {
-      subscriber.workView = work.viewKey()
+      subscriber.workView = work.workViewKey()
     }
   }
 }

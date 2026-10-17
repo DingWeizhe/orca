@@ -29,6 +29,7 @@ import {
   type StructuredAgentSessionCurrentWork
 } from './structured-agent-session-current-work'
 import type { AgentSessionJournal } from '../agent-session-journal/journal-store'
+import { whileStructuredAgentSessionHandingOver } from './structured-agent-session-handing-over'
 import type { JournalOperationReceipt } from '../agent-session-journal/journal-row-writer'
 import type {
   AgentSessionDispatchOutcome,
@@ -213,7 +214,10 @@ export async function performSend(
   }
 }
 
-export type AgentSessionHandoverContext = StructuredAgentSessionCommandHandoverContext
+export type AgentSessionHandoverContext = StructuredAgentSessionCommandHandoverContext & {
+  /** What is current changed with no row (`publishGenerationEnded`). */
+  workChanged?: () => void
+}
 
 /**
  * Hands one queued submission to the provider. The `dispatch{pending}` row goes first: a crash
@@ -243,25 +247,40 @@ export async function handOverSubmission(
   // on this same row before anything is written.
   const turnScope = contextStructuredAgentSessionCurrentWork(ctx).turnScope()
   const carried = carriedStoppedHistory(ctx, turnScope, submission, body)
-  await ctx.journal.resolveDispatch({
+  await whileStructuredAgentSessionHandingOver(
+    ctx.journal,
     clientMessageId,
-    state: 'pending',
-    fence: ctx.fence,
-    turnScope,
-    ...(carried ? { carries: carried.covers } : {})
-  })
-  // The handover row's instant on the host clock; the turn this dispatch opens records it so the
-  // live counter never re-anchors at turn-open.
-  const outcome = await dispatchSafely(
-    ctx,
-    clientMessageId,
-    carried ? withStoppedHistory(body, carried.messages) : body,
-    structuredAgentSessionHandoverOrigin(ctx.journal, submission)
+    async (released) => {
+      await ctx.journal.resolveDispatch({
+        clientMessageId,
+        state: 'pending',
+        fence: ctx.fence,
+        turnScope,
+        ...(carried ? { carries: carried.covers } : {})
+      })
+      const outcome = await dispatchSafely(
+        ctx,
+        clientMessageId,
+        carried ? withStoppedHistory(body, carried.messages) : body,
+        structuredAgentSessionHandoverOrigin(ctx.journal, submission)
+      )
+      // An admission needs no dispatch row: the submission is already pending, and from here the
+      // child's own report says whether it still holds it. Any other outcome's row says so.
+      if (outcome.state === 'admitted') {
+        released()
+        return
+      }
+      await resolveHandoverOutcome(ctx, clientMessageId, outcome)
+    },
+    ctx.workChanged
   )
-  // An admission needs no dispatch row: the submission is already pending.
-  if (outcome.state === 'admitted') {
-    return
-  }
+}
+
+async function resolveHandoverOutcome(
+  ctx: AgentSessionHandoverContext,
+  clientMessageId: string,
+  outcome: Exclude<AgentSessionDispatchOutcome, { state: 'admitted' }>
+): Promise<void> {
   try {
     await ctx.journal.resolveDispatch(
       outcome.state === 'accepted'

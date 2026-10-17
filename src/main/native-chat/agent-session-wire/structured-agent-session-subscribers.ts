@@ -142,7 +142,7 @@ export class AgentSessionSubscribers {
         ),
         work
       )
-      subscriber.workView = work?.viewKey()
+      subscriber.workView = work?.workViewKey()
       this.emit(
         subscriber,
         {
@@ -228,7 +228,7 @@ export class AgentSessionSubscribers {
     const hostNow = this.now()
     for (const subscriber of this.subscribers(sessionId)) {
       const page = pageFor(subscriber)
-      subscriber.workView = work?.viewKey()
+      subscriber.workView = work?.workViewKey()
       this.emit(
         subscriber,
         {
