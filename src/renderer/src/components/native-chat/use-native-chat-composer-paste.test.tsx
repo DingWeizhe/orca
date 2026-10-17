@@ -689,19 +689,28 @@ describe('file-manager copies', () => {
       )
       mocks.saveClipboardImageAsTempFile.mockResolvedValue('/tmp/shot.png')
       const attachCopiedFiles = vi.fn()
+      const continueCopiedFiles = vi.fn(async () => {})
       const store = createChipStore()
       const probe = await renderProbe({
         resolveAttachmentOwner: () => ({ kind: 'local' }),
         attachCopiedFiles,
+        continueCopiedFiles,
         store
       })
       await act(async () => probe.latest().handlePaste(fileCopyEvent([png('Screenshot.png')], '')))
       expect(store.chips).toEqual([expect.objectContaining({ pending: true })])
       await act(async () => finishRead(nativeText))
-      expect(attachCopiedFiles).toHaveBeenCalledTimes(attachesFiles ? 1 : 0)
-      expect(store.chips).toEqual(
-        attachesFiles ? [] : [expect.objectContaining({ path: '/tmp/shot.png', pending: false })]
+      // Files continue the chip reserved at paste time; no new attach starts.
+      expect(attachCopiedFiles).not.toHaveBeenCalled()
+      expect(continueCopiedFiles.mock.calls).toEqual(
+        attachesFiles ? [[[{ path: '/Users/me/Desktop/Screenshot.png', chipId: 'chip-1' }]]] : []
       )
+      expect(store.chips).toEqual([
+        attachesFiles
+          ? expect.objectContaining({ id: 'chip-1', pending: true })
+          : expect.objectContaining({ path: '/tmp/shot.png', pending: false })
+      ])
+      expect(mocks.saveClipboardImageAsTempFile).toHaveBeenCalledTimes(attachesFiles ? 0 : 1)
     }
   )
 

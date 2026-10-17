@@ -1,6 +1,7 @@
 import { act, createElement, useLayoutEffect } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { NativeChatAttachmentOwner } from './native-chat-attachment-upload'
+import type { NativeChatReservedAttachment } from './native-chat-session-attachment-drop'
 import { useNativeChatComposerPaste } from './use-native-chat-composer-paste'
 
 type HookApi = ReturnType<typeof useNativeChatComposerPaste>
@@ -58,6 +59,7 @@ type ProbeArgs = {
   resolveAttachmentOwner: () => NativeChatAttachmentOwner
   attachResolvedPaths: (paths: string[], connectionId?: string | null) => void
   attachCopiedFiles: (paths: string[]) => void
+  captureCopiedFiles: () => (reserved: NativeChatReservedAttachment[]) => Promise<void>
   beginPendingImageAttachment: (previewUrl?: string) => string | null
   resolvePendingImageAttachment: (id: string, path: string, connectionId?: string | null) => void
   revealPendingImageAttachment: (id: string, previewUrl?: string) => void
@@ -86,6 +88,8 @@ export async function renderProbe(args: {
   resolveAttachmentOwner: () => NativeChatAttachmentOwner
   attachResolvedPaths?: (paths: string[], connectionId?: string | null) => void
   attachCopiedFiles?: (paths: string[]) => void
+  /** Receives the chips a macOS paste reserved, once the clipboard shows they are files. */
+  continueCopiedFiles?: (reserved: NativeChatReservedAttachment[]) => Promise<void>
   store?: ReturnType<typeof createChipStore>
   insertTypedText?: (text: string) => boolean
   setNotice?: (notice: string | null) => void
@@ -110,6 +114,7 @@ export async function renderProbe(args: {
           resolveAttachmentOwner: args.resolveAttachmentOwner,
           attachResolvedPaths: args.attachResolvedPaths ?? (() => {}),
           attachCopiedFiles: args.attachCopiedFiles ?? (() => {}),
+          captureCopiedFiles: () => args.continueCopiedFiles ?? (async () => {}),
           beginPendingImageAttachment: args.agent === 'omp' ? () => null : store.begin,
           resolvePendingImageAttachment: store.resolve,
           revealPendingImageAttachment: store.reveal,

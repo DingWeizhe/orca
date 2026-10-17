@@ -181,19 +181,20 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       ? !hasPty || !onStop
       : sendHeld || (draft.trim() === '' && imageAttachments.length === 0)
 
-    const { pickAttachments, attachExternalPaths, resolveAttachmentOwner } = useNativeChatFileDrops({
-      paneKey,
-      draftScopeKey,
-      targetPtyId,
-      structuredTransport,
-      terminalTabId,
-      structuredWorktreeId: structuredTransport?.worktreeId,
-      structuredSession: structuredTransport,
-      disabled,
-      attachResolvedPaths,
-      pendingChips: attachments.pendingChips,
-      setNotice
-    })
+    const { pickAttachments, attachExternalPaths, captureCopiedFiles, resolveAttachmentOwner } =
+      useNativeChatFileDrops({
+        paneKey,
+        draftScopeKey,
+        targetPtyId,
+        structuredTransport,
+        terminalTabId,
+        structuredWorktreeId: structuredTransport?.worktreeId,
+        structuredSession: structuredTransport,
+        disabled,
+        attachResolvedPaths,
+        pendingChips: attachments.pendingChips,
+        setNotice
+      })
 
     const handlePasteEvent = useNativeChatComposerHandle(ref, {
       attachmentScopeKey: draftScopeKey,
@@ -215,6 +216,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       resolveAttachmentOwner,
       attachResolvedPaths,
       attachCopiedFiles: attachExternalPaths,
+      captureCopiedFiles,
       beginPendingImageAttachment: attachments.beginPendingImageAttachment,
       // Settles into the scope cache, which outlives a composer a prompt card unmounted.
       resolvePendingImageAttachment: attachments.pendingChips.resolve,

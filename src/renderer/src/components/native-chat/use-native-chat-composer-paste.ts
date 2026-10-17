@@ -34,6 +34,7 @@ export function useNativeChatComposerPaste({
   resolveAttachmentOwner,
   attachResolvedPaths,
   attachCopiedFiles,
+  captureCopiedFiles,
   beginPendingImageAttachment,
   resolvePendingImageAttachment,
   revealPendingImageAttachment,
@@ -49,15 +50,21 @@ export function useNativeChatComposerPaste({
   useLayoutEffect(() => {
     disabledRef.current = disabled
   }, [disabled])
-  const { lifetime, startImageChip, startClipboardImageChip, keepStoreUploadAfterUnmount } =
-    useNativeChatPasteLifetime({
-      targetKey,
-      attachmentScopeKey,
-      beginPendingImageAttachment,
-      resolvePendingImageAttachment,
-      revealPendingImageAttachment,
-      dropPendingImageAttachment
-    })
+  const {
+    lifetime,
+    startImageChip,
+    startClipboardImageChip,
+    startClipboardCandidateChips,
+    dropImagePaste,
+    keepStoreUploadAfterUnmount
+  } = useNativeChatPasteLifetime({
+    targetKey,
+    attachmentScopeKey,
+    beginPendingImageAttachment,
+    resolvePendingImageAttachment,
+    revealPendingImageAttachment,
+    dropPendingImageAttachment
+  })
   const canPaste = useCallback(() => lifetime.active && !disabledRef.current, [lifetime])
   // A disabled composer still answers a paste, so it never vanishes silently.
   const showPasteUnavailable = useCallback(() => {
@@ -65,15 +72,6 @@ export function useNativeChatComposerPaste({
       setNotice(nativeChatPasteUnavailableNotice())
     }
   }, [lifetime, setNotice])
-  const dropImagePaste = useCallback(
-    (pendingId: string | null) => {
-      if (pendingId) {
-        lifetime.pending.delete(pendingId)
-        dropPendingImageAttachment(pendingId)
-      }
-    },
-    [lifetime, dropPendingImageAttachment]
-  )
 
   /** Settle the operation started at paste time, or attach directly if chips are unavailable. */
   const settleImagePaste = useCallback(
@@ -153,27 +151,30 @@ export function useNativeChatComposerPaste({
           ? resolveAttachmentOwner()
           : null
       // This event hides Finder's file names, so the native clipboard tells a file copy from a
-      // screenshot's picture; the chip holds Send meanwhile.
+      // screenshot's picture. One chip per file holds Send meanwhile, and whichever wins settles
+      // those same chips, so removing one cancels it and an unmount still finishes into the draft.
       if (macOwner && ownerAcceptsClipboardImage(macOwner)) {
-        const { id: pendingId, reveal } = startClipboardImageChip(macOwner)
+        const chips = startClipboardCandidateChips(macOwner, copiedFilePaths)
+        const [primary, ...extras] = chips.reserved
+        if (!primary) {
+          return
+        }
+        const continueFiles = captureCopiedFiles({ focus: false })
         void readClipboardPasteText(NATIVE_CHAT_CONTEXT_PASTE_MAX_BYTES, copiedFilePaths).then(
           (read) => {
-            if (read.copiedFilePaths.length === 0) {
-              if (read.text && canPaste()) {
-                insertTypedText(read.text)
-              }
-              reveal()
-              void saveClipboardImage(macOwner, pendingId, read.text !== '')
+            if (read.copiedFilePaths.length > 0) {
+              void continueFiles(chips.transfer())
               return
             }
-            // The drop route reserves its own chips before this one goes, so Send stays held.
-            if (canPaste()) {
-              attachCopiedFiles(read.copiedFilePaths, { focus: false })
+            extras.forEach(({ chipId }) => dropImagePaste(chipId))
+            if (read.text && canPaste()) {
+              insertTypedText(read.text)
             }
-            dropImagePaste(pendingId)
+            chips.reveal()
+            void saveClipboardImage(macOwner, primary.chipId, read.text !== '')
           },
           (error) => {
-            dropImagePaste(pendingId)
+            chips.reserved.forEach(({ chipId }) => dropImagePaste(chipId))
             if (canPaste()) {
               setNativeChatPasteFailure(setNotice, error)
             }
@@ -230,13 +231,14 @@ export function useNativeChatComposerPaste({
     [
       attachCopiedFiles,
       canPaste,
+      captureCopiedFiles,
       caret,
       dropImagePaste,
       insertTypedText,
       showPasteUnavailable,
       resolveAttachmentOwner,
       startImageChip,
-      startClipboardImageChip,
+      startClipboardCandidateChips,
       saveClipboardImage,
       setCaret,
       setNotice

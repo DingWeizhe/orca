@@ -34,6 +34,20 @@ export type NativeChatPendingAttachmentChips = {
   ) => boolean
 }
 
+/** A file and the pending chip reserved for it, which alone may settle its result. */
+export type NativeChatReservedAttachment = { path: string; chipId: string }
+
+/** One named pending chip per file; a path without one was refused and the composer said why. */
+export function reserveNativeChatAttachmentChips(
+  chips: NativeChatPendingAttachmentChips,
+  paths: string[]
+): NativeChatReservedAttachment[] {
+  return paths.flatMap((path) => {
+    const chipId = chips.begin(undefined, basename(path))
+    return chipId ? [{ path, chipId }] : []
+  })
+}
+
 /**
  * Drop or pick files into a structured chat on a paired server: upload them into the chat's store
  * there, then attach the stored paths. Each file shows as a pending chip with its name at once, and
@@ -41,7 +55,7 @@ export type NativeChatPendingAttachmentChips = {
  * the user removes meanwhile attaches nothing.
  */
 export async function attachNativeChatSessionAttachmentPaths(args: {
-  paths: string[]
+  pending: NativeChatReservedAttachment[]
   owner: NativeChatRuntimeSessionAttachmentOwner
   chips: NativeChatPendingAttachmentChips
   options?: NativeChatAttachmentFocusOptions
@@ -50,11 +64,7 @@ export async function attachNativeChatSessionAttachmentPaths(args: {
   ownerStillCurrent: () => boolean
   setNotice: (notice: string | null) => void
 }): Promise<void> {
-  const pending = args.paths.flatMap((path) => {
-    const chipId = args.chips.begin(undefined, basename(path))
-    // No chip: the composer refused the attach and already said why.
-    return chipId ? [{ path, chipId }] : []
-  })
+  const { pending } = args
   if (pending.length === 0) {
     return
   }

@@ -96,6 +96,7 @@ async function fixture(acceptsImages = true, source: 'menu' | 'event' = 'menu') 
       caret: 0,
       resolveAttachmentOwner: () => owner,
       attachCopiedFiles: () => {},
+      captureCopiedFiles: () => async () => {},
       ...attachments,
       insertTypedText: () => true,
       setCaret: () => {},

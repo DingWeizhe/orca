@@ -85,6 +85,7 @@ function Probe({
     resolveAttachmentOwner: owner,
     attachResolvedPaths: attachments.attachResolvedPaths,
     attachCopiedFiles: () => {},
+    captureCopiedFiles: () => async () => {},
     beginPendingImageAttachment: attachments.beginPendingImageAttachment,
     resolvePendingImageAttachment: attachments.resolvePendingImageAttachment,
     revealPendingImageAttachment: attachments.revealPendingImageAttachment,

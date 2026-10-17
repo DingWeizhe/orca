@@ -1,6 +1,5 @@
 import { useCallback, useLayoutEffect, useRef } from 'react'
 import { useAppStore } from '@/store'
-import { basename } from '@/lib/path'
 import { NATIVE_FILE_DROP_MAX_PATHS } from '../../../../shared/native-file-drop'
 import {
   nativeChatAttachmentOwnerUnchanged,
@@ -21,7 +20,9 @@ import {
 } from './native-chat-attachment-upload'
 import {
   attachNativeChatSessionAttachmentPaths,
-  type NativeChatPendingAttachmentChips
+  reserveNativeChatAttachmentChips,
+  type NativeChatPendingAttachmentChips,
+  type NativeChatReservedAttachment
 } from './native-chat-session-attachment-drop'
 import { userNamedFileAccess } from '@/lib/local-file-access'
 import { useMountedRef } from '@/hooks/useMountedRef'
@@ -82,6 +83,10 @@ export function useNativeChatExternalAttachments({
     destinationIsCurrent?: () => boolean,
     options?: NativeChatAttachmentFocusOptions
   ) => (paths: string[]) => Promise<void>
+  captureReservedAttachments: (
+    destinationIsCurrent?: () => boolean,
+    options?: NativeChatAttachmentFocusOptions
+  ) => (reserved: NativeChatReservedAttachment[]) => Promise<void>
 } {
   const mountedRef = useMountedRef()
   const disabledRef = useRef(disabled)
@@ -124,12 +129,11 @@ export function useNativeChatExternalAttachments({
       : resolveNativeChatAttachmentOwner(useAppStore.getState(), terminalTabId)
   }, [])
 
-  const captureExternalDrop = useCallback(
-    (
-      destinationIsCurrent: () => boolean = () => true,
-      options?: NativeChatAttachmentFocusOptions
-    ) => {
+  // Captures one intake's owner, destination and chips; its checks and work run against them later.
+  const captureIntake = useCallback(
+    (destinationIsCurrent: () => boolean, options?: NativeChatAttachmentFocusOptions) => {
       const owner = resolveAttachmentOwner()
+      const chips = pendingChipsRef.current
       const capturedWorkspace = workspaceRef.current
       const currentWorktreeId = (): string | null =>
         workspaceRef.current.structuredWorktreeId ??
@@ -143,36 +147,28 @@ export function useNativeChatExternalAttachments({
         isSameComposerWorkspace(capturedWorkspace, workspaceRef.current) &&
         capturedWorktreeId === currentWorktreeId() &&
         nativeChatAttachmentOwnerUnchanged(owner, resolveAttachmentOwner())
-      return async (paths: string[]): Promise<void> => {
-        if (paths.length === 0 || disabledRef.current || !mountedRef.current) {
-          return
-        }
+      const refusal = (count: number): string | null => {
         if (!destinationIsCurrent()) {
-          setNotice(nativeChatAttachmentOwnerChangedNotice())
-          return
+          return nativeChatAttachmentOwnerChangedNotice()
         }
         if (owner.kind === 'not-ready') {
-          setNotice(nativeChatWorktreeNotReadyNotice())
-          return
+          return nativeChatWorktreeNotReadyNotice()
         }
         if (owner.kind === 'remote') {
-          setNotice(nativeChatLocalAttachmentUnsupportedNotice())
-          return
+          return nativeChatLocalAttachmentUnsupportedNotice()
         }
         // The picker shares the drop limit without partially attaching a batch.
-        if (paths.length > NATIVE_FILE_DROP_MAX_PATHS) {
-          setNotice(nativeChatTooManyAttachmentsNotice())
-          return
+        if (count > NATIVE_FILE_DROP_MAX_PATHS) {
+          return nativeChatTooManyAttachmentsNotice()
         }
-        if (!ownerStillCurrent()) {
-          setNotice(nativeChatAttachmentOwnerChangedNotice())
-          return
-        }
+        return ownerStillCurrent() ? null : nativeChatAttachmentOwnerChangedNotice()
+      }
+      const run = async (reserved: NativeChatReservedAttachment[]): Promise<void> => {
         if (owner.kind === 'runtime-session') {
           await attachNativeChatSessionAttachmentPaths({
-            paths,
+            pending: reserved,
             owner,
-            chips: pendingChipsRef.current,
+            chips,
             options,
             isAbandoned: () => disabledRef.current,
             ownerStillCurrent,
@@ -180,15 +176,8 @@ export function useNativeChatExternalAttachments({
           })
           return
         }
-        const chips = pendingChipsRef.current
-        const pending: { path: string; chipId: string }[] = []
+        const pending = [...reserved]
         try {
-          for (const path of paths) {
-            const chipId = chips.begin(undefined, basename(path))
-            if (chipId) {
-              pending.push({ path, chipId })
-            }
-          }
           if (pending.length === 0) {
             return
           }
@@ -251,8 +240,56 @@ export function useNativeChatExternalAttachments({
           }
         }
       }
+      return { chips, refusal, run }
     },
-    [attachResolvedPaths, mountedRef, resolveAttachmentOwner, setNotice]
+    [attachResolvedPaths, resolveAttachmentOwner, setNotice]
+  )
+
+  const captureExternalDrop = useCallback(
+    (
+      destinationIsCurrent: () => boolean = () => true,
+      options?: NativeChatAttachmentFocusOptions
+    ) => {
+      const intake = captureIntake(destinationIsCurrent, options)
+      return async (paths: string[]): Promise<void> => {
+        if (paths.length === 0 || disabledRef.current || !mountedRef.current) {
+          return
+        }
+        const notice = intake.refusal(paths.length)
+        if (notice) {
+          setNotice(notice)
+          return
+        }
+        await intake.run(reserveNativeChatAttachmentChips(intake.chips, paths))
+      }
+    },
+    [captureIntake, mountedRef, setNotice]
+  )
+
+  // Chips a paste reserved before its clipboard said they are files: admitted work, so it may
+  // finish after an unmount; a refusal releases them.
+  const captureReservedAttachments = useCallback(
+    (
+      destinationIsCurrent: () => boolean = () => true,
+      options?: NativeChatAttachmentFocusOptions
+    ) => {
+      const intake = captureIntake(destinationIsCurrent, options)
+      return async (reserved: NativeChatReservedAttachment[]): Promise<void> => {
+        if (reserved.length === 0) {
+          return
+        }
+        const notice = disabledRef.current ? '' : intake.refusal(reserved.length)
+        if (notice === null) {
+          await intake.run(reserved)
+          return
+        }
+        reserved.forEach(({ chipId }) => intake.chips.drop(chipId))
+        if (notice) {
+          setNotice(notice)
+        }
+      }
+    },
+    [captureIntake, setNotice]
   )
   const attachExternalPaths = useCallback(
     (paths: string[], options?: NativeChatAttachmentFocusOptions): void => {
@@ -263,5 +300,10 @@ export function useNativeChatExternalAttachments({
     [captureExternalDrop, mountedRef]
   )
 
-  return { attachExternalPaths, captureExternalDrop, resolveAttachmentOwner }
+  return {
+    attachExternalPaths,
+    captureExternalDrop,
+    captureReservedAttachments,
+    resolveAttachmentOwner
+  }
 }
