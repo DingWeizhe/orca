@@ -146,6 +146,8 @@ export type StructuredAgentSessionCommandHandoverContext = {
   /** Who a failure the handover meets names, as the start's own row does. */
   failureTextContext?: AgentSessionFailureWordsContext
   record: () => AgentSessionRecord | null
+  /** Read the execution host's ownership again at admission and handover. */
+  currentWork?: () => StructuredAgentSessionCurrentWork | null
   /** The session's child records, the same read the strip and conversation-command admission use. */
   childWork: () => readonly AgentChildWorkView[] | undefined
   now: () => number

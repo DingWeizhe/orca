@@ -238,19 +238,17 @@ export async function handOverSubmission(
     })
     return
   }
-  if (body.command) {
-    await handOverStructuredAgentSessionCommand(ctx, submission, body)
-    return
-  }
-  // The message joins the turn the child it goes to is running, a steer, or opens its own; never a
-  // turn an ended generation left. A new turn carries the stopped messages owed to the agent, named
-  // on this same row before anything is written.
-  const turnScope = contextStructuredAgentSessionCurrentWork(ctx).turnScope()
-  const carried = carriedStoppedHistory(ctx, turnScope, submission, body)
   await whileStructuredAgentSessionHandingOver(
     ctx.journal,
     clientMessageId,
     async (released) => {
+      if (body.command) {
+        await handOverStructuredAgentSessionCommand(ctx, submission, body)
+        return
+      }
+      // Join only the live child's turn; a new turn carries the stopped history on its first row.
+      const turnScope = contextStructuredAgentSessionCurrentWork(ctx).turnScope()
+      const carried = carriedStoppedHistory(ctx, turnScope, submission, body)
       await ctx.journal.resolveDispatch({
         clientMessageId,
         state: 'pending',

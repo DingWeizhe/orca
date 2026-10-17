@@ -49,9 +49,7 @@ export function agentSessionPublishedWorkFields(
   return publishedWorkFields(snapshotLatestTurn(journal.snapshot()), work)
 }
 
-/** A page as the host publishes it: its turn record scoped by the projection, an ended
- *  generation's turn running nowhere, and every unanswered send as the projection reads it, on the
- *  page or not, which a client replaces by id. */
+/** Page-local effective values; off-page sends ride separately budgeted subscriber batches. */
 export function withPublishedWork(
   page: AgentSessionHistoryPage,
   work: AgentSessionPublishedWork | undefined
@@ -59,14 +57,10 @@ export function withPublishedWork(
   if (!work) {
     return page
   }
-  const onPage = new Set(page.submissions.map((submission) => submission.clientMessageId))
   return {
     ...page,
     ...publishedWorkFields(page.latestTurn, work),
-    submissions: [
-      ...page.submissions.map(work.publishedSubmission),
-      ...work.restatedSubmissions().filter((submission) => !onPage.has(submission.clientMessageId))
-    ]
+    submissions: page.submissions.map(work.publishedSubmission)
   }
 }
 

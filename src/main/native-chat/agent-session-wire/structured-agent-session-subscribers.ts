@@ -28,6 +28,7 @@ import { withPublishedWork } from './agent-session-published-work'
 import { subscriberHistoryReader } from './agent-session-bounded-frames'
 import { rememberSessionActivity } from './structured-agent-session-activity-retention'
 import { refreshDerivedStopNotes } from './agent-session-stop-note-refresh'
+import { refreshPublishedWork } from './agent-session-work-refresh'
 import type { StructuredAgentSessionCurrentWork } from './structured-agent-session-current-work'
 
 export type AgentSessionSubscriberEmit = (event: AgentSessionSubscribeEvent) => void
@@ -142,7 +143,6 @@ export class AgentSessionSubscribers {
         ),
         work
       )
-      subscriber.workView = work?.workViewKey()
       this.emit(
         subscriber,
         {
@@ -156,6 +156,7 @@ export class AgentSessionSubscribers {
         { currentWork: work }
       )
       subscriber.cursor = page.liveCursor ?? page.window.nextCursor
+      this.refreshWork(subscriber, input.journal, hostNow, work)
     }
     const { sessionId, id } = subscriber
     return () => this.close(sessionId, id)
@@ -228,7 +229,6 @@ export class AgentSessionSubscribers {
     const hostNow = this.now()
     for (const subscriber of this.subscribers(sessionId)) {
       const page = pageFor(subscriber)
-      subscriber.workView = work?.workViewKey()
       this.emit(
         subscriber,
         {
@@ -243,6 +243,7 @@ export class AgentSessionSubscribers {
       )
       subscriber.cursor = page.liveCursor ?? page.window.nextCursor
       subscriber.fence = fence
+      this.refreshWork(subscriber, journal, hostNow, work)
     }
     this.hooks.onJournalPublished?.(sessionId, journal)
   }
@@ -313,6 +314,21 @@ export class AgentSessionSubscribers {
   }
 
   private now = (): number => this.hooks.now?.() ?? Date.now()
+
+  private refreshWork(
+    subscriber: Subscriber,
+    journal: AgentSessionJournal,
+    hostNow: number,
+    work: AgentSessionPublishedWork | undefined
+  ): void {
+    refreshPublishedWork(
+      { emit: (target, event, options) => this.emit(target, event, options), isActive: this.isActive },
+      subscriber,
+      journal,
+      work,
+      { hostNow }
+    )
+  }
 
   private isActive = (subscriber: Subscriber): boolean =>
     this.bySession.get(subscriber.sessionId)?.get(subscriber.id) === subscriber

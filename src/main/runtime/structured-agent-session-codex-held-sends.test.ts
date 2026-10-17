@@ -161,6 +161,75 @@ afterEach(async () => {
 })
 
 describe('a Codex send whose turn completes without taking it', () => {
+  it('allows /compact afterwards without returning or publishing an unconfirmed command', async () => {
+    const blocked = await send('a hook blocks this prompt')
+    await vi.waitFor(() => expect(answers).toBe(1))
+    turns.start()
+    turns.end('completed')
+    await vi.waitFor(() => expect(host.currentWork(SESSION)?.working()).toBe(false))
+    expect((await rawSubmission(blocked)).dispatchState).toBe('pending')
+
+    const command = 'compact' as const
+    const result = await host.conversationCommand(CALLER, {
+      command,
+      envelope: {
+        sessionId: SESSION,
+        clientOperationId: operationId(),
+        expectedRuntimeFence: fence,
+        payloadFingerprint: computeAgentSessionPayloadFingerprint({
+          method: 'agentSession.conversationCommand',
+          sessionId: SESSION,
+          fields: { command }
+        })
+      }
+    })
+    expect(result).toMatchObject({ ok: true, value: { command, state: 'completed' } })
+    if (!result.ok) {
+      throw new Error(JSON.stringify(result.refusal))
+    }
+    expect(result.value).not.toHaveProperty('error')
+    await vi.waitFor(() => expect(host.currentWork(SESSION)?.activeTurnId()).toMatch(/^compact:/))
+    const snapshot = await host.journalSnapshot(SESSION)
+    const compact = snapshot.submissions.find((entry) => entry.clientMessageId !== blocked)
+    if (!compact) {
+      throw new Error('missing command submission')
+    }
+    await vi.waitFor(async () =>
+      expect((await rawSubmission(compact.clientMessageId)).dispatchState).toBe('accepted')
+    )
+    const states = events
+      .flatMap((event) => (event.type === 'batch' ? event.batch.submissions : []))
+      .filter((entry) => entry.clientMessageId === compact.clientMessageId)
+    expect(states.length).toBeGreaterThan(0)
+    expect(states.every((entry) => entry.dispatchState !== 'unknown' && !entry.recovered)).toBe(true)
+
+    handlers?.onNotification?.('turn/started', {
+      threadId: THREAD,
+      turn: { id: 'turn-compact', status: 'inProgress' }
+    })
+    handlers?.onNotification?.('item/completed', {
+      threadId: THREAD,
+      turnId: 'turn-compact',
+      item: { type: 'contextCompaction', id: 'compact' }
+    })
+    handlers?.onNotification?.('turn/completed', {
+      threadId: THREAD,
+      turn: { id: 'turn-compact', status: 'completed' }
+    })
+    await vi.waitFor(() => expect(host.currentWork(SESSION)?.working()).toBe(false))
+    expect((await host.journalSnapshot(SESSION)).items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          body: expect.objectContaining({
+            kind: 'turn',
+            turnId: expect.stringMatching(/^compact:/),
+            state: 'completed'
+          })
+        })
+      ])
+    )
+  })
+
   it('stops being Working with no row written, for the host and a client already following', async () => {
     const blocked = await send('a hook blocks this prompt')
     await vi.waitFor(() => expect(answers).toBe(1))
