@@ -1,12 +1,5 @@
 import type { NativeChatComposerInput } from './native-chat-composer-input'
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useSyncExternalStore,
-  type RefObject
-} from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, type RefObject } from 'react'
 import {
   nativeChatComposerTargetIsRemote,
   nativeChatLocalAttachmentUnsupportedNotice,
@@ -14,12 +7,9 @@ import {
 } from './native-chat-composer-target'
 import type { NativeChatComposerImageAttachment } from './NativeChatComposerField'
 import {
-  isKeptLocalPaste,
   readNativeChatComposerDraft,
-  subscribeToNativeChatComposerDraft,
   updateNativeChatComposerDraft
 } from './native-chat-composer-draft-store'
-import { useRestoredNativeChatComposerDraftImageCheck } from './native-chat-composer-draft-image-check'
 import type { NativeChatResolvedPathOptions } from './native-chat-resolved-path-ownership'
 import { useNativeChatResolvedPathAttachments } from './use-native-chat-resolved-path-attachments'
 import type {
@@ -32,11 +22,10 @@ import {
   settleNativeChatPendingAttachment,
   settleNativeChatPendingAttachmentReferences,
   nativeChatPendingAttachmentSnapshot,
-  takeNativeChatPendingAttachment,
-  useNativeChatPendingAttachments
+  takeNativeChatPendingAttachment
 } from './native-chat-pending-attachment-cache'
 import { appendNativeChatAttachmentCache } from './native-chat-draft-cache'
-import { useNativeChatComposerAttachmentPreviews } from './use-native-chat-composer-attachment-previews'
+import { useNativeChatComposerImageChips } from './use-native-chat-composer-image-chips'
 import { createUuidV4 } from '../../../../shared/uuid-v4'
 
 export type UseNativeChatComposerAttachmentsArgs = {
@@ -87,38 +76,8 @@ export function useNativeChatComposerAttachments({
   dropPendingImageAttachment: (id: string) => boolean
   pendingChips: NativeChatPendingAttachmentChips
 } {
-  const subscribe = useCallback(
-    (listener: () => void) => subscribeToNativeChatComposerDraft(attachmentScopeKey, listener),
-    [attachmentScopeKey]
-  )
-  const settled = useSyncExternalStore(
-    subscribe,
-    () => readNativeChatComposerDraft(attachmentScopeKey).images
-  )
-  // Why: a restored paste shows only once main confirms it is still kept, so until the restore
-  // check is done it waits like a chip still saving, instead of flashing before a placeholder.
-  const restoring = useRestoredNativeChatComposerDraftImageCheck(attachmentScopeKey, subscribe)
-  // Chips still on their way live outside the composer, so one a prompt card unmounted comes back
-  // still pending and settles into the draft whichever composer is showing.
-  const pending = useNativeChatPendingAttachments(attachmentScopeKey)
-  const { previews, setPreview, releasePreview, releaseAllPreviews } =
-    useNativeChatComposerAttachmentPreviews(settled, pending)
-  const imageAttachments = useMemo(
-    () => [
-      ...settled.map((image) => {
-        const previewUrl = previews.get(image.id)
-        if (restoring && isKeptLocalPaste(image)) {
-          return { ...image, pending: true }
-        }
-        return previewUrl ? { ...image, previewUrl } : image
-      }),
-      ...pending.map((chip) => {
-        const previewUrl = previews.get(chip.id)
-        return previewUrl ? { ...chip, previewUrl } : chip
-      })
-    ],
-    [pending, previews, restoring, settled]
-  )
+  const { imageAttachments, setPreview, releasePreview, releaseAllPreviews } =
+    useNativeChatComposerImageChips(attachmentScopeKey)
   const mountedRef = useMemo(
     () => ({ scopeKey: attachmentScopeKey, current: true, acceptsImages: true }),
     [attachmentScopeKey]
