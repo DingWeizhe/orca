@@ -12,7 +12,7 @@ import { shellSwitchDecision } from '../../../src/mobile-web-shell/shell-switch-
  *
  * The shell decides, not this switch: it renders the page only for a route the bundle lists with
  * grants this app implements, and walls the host otherwise. So the one way to stay native is a build
- * without the shell; `fallback` is no longer reached.
+ * without the shell.
  *
  * Encoded, not interpolated raw, for the reason `web.tsx` states: a deep-linked host id carrying
  * `?`, `#` or whitespace would build a pathname the page refuses, and a refusal here is a failure
@@ -49,7 +49,6 @@ function HostListScreen() {
       key={hostId}
       hostId={hostId}
       route={decision.route}
-      fallback={native}
     />
   )
 }

@@ -21,7 +21,8 @@ import {
   CHECKING,
   gateKey,
   gateState,
-  gateVerdict
+  gateVerdict,
+  ROUTE_UNAVAILABLE
 } from './mobile-web-shell-gates'
 import { pageRouteRefusalVerdict, routeViewOf, sameRouteView } from './page-route-policy'
 import { CLEAR_PAGE_DOCUMENT_STATE, pageDocumentStatePatch } from './page-document-state'
@@ -31,10 +32,12 @@ import { AWAIT_DOCUMENT_LOAD, reducePageDocumentLifecycle } from './page-documen
 
 export function createMobileWebShellSession(
   routePathname: string,
-  wide = false
+  wide = false,
+  appNamesRoute = true
 ): MobileWebShellSession {
   return {
     routePathname,
+    appNamesRoute,
     wide,
     pageRoutes: [],
     pageRouteGrants: [],
@@ -139,8 +142,12 @@ function onManifestRead(
   }
   if (!rendersRoute(view.pageRoutes, session.routePathname)) {
     // The view is kept so a layout flip that would serve the route restarts the session.
-    const refusal = pageRouteRefusalVerdict(manifest.routes, session.routePathname, session.wide)
-    return step(session, { ...view, state: { kind: 'wall', verdict: refusal } })
+    const refusal = session.appNamesRoute
+      ? pageRouteRefusalVerdict(manifest.routes, session.routePathname, session.wide)
+      : null
+    const state =
+      refusal === null ? ROUTE_UNAVAILABLE : ({ kind: 'wall', verdict: refusal } as const)
+    return step(session, { ...view, state })
   }
   // Same build id is the same bytes (the id is their digest), so the generation on disk opens as is.
   const cached = session.cached
@@ -275,7 +282,10 @@ function onLayoutChanged(session: MobileWebShellSession, wide: boolean): MobileW
     return step(session, { wide })
   }
   // Still counting flows, so nothing the old session has in flight lands on this one.
-  const fresh = { ...createMobileWebShellSession(session.routePathname, wide), flow: session.flow }
+  const fresh = {
+    ...createMobileWebShellSession(session.routePathname, wide, session.appNamesRoute),
+    flow: session.flow
+  }
   return startFlow(fresh, session.gates)
 }
 

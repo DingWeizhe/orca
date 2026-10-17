@@ -11,6 +11,7 @@ import type {
 /** Shared because several transitions reach each of them, and two objects that are equal but not
  *  identical are two renders where the reducer meant one. */
 export const CHECKING: MobileWebShellSessionState = { kind: 'checking' }
+export const ROUTE_UNAVAILABLE: MobileWebShellSessionState = { kind: 'route-unavailable' }
 
 /**
  * Whether a gates change may start or restart the flow.

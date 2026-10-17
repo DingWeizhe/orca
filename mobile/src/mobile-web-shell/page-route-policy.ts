@@ -11,9 +11,8 @@ export type MobileWebPageRoute = NonNullable<MobileWebBundleManifestRead['routes
  * What this app build does on a page's behalf.
  *
  * Every name here is a capability the shell implements and will honour over the bridge, and it is
- * the same list `init.grants.native` tells the page it has. A bundle naming a grant absent from
- * here renders its native screen instead: an old app against a new bundle lands on a screen that
- * works rather than on a tap that does nothing.
+ * the same list `init.grants.native` tells the page it has. A route naming a grant absent from
+ * here is not served: this app asks to be updated rather than landing on a tap that does nothing.
  */
 export const MOBILE_WEB_SHELL_GRANTS = [
   'navigate',
@@ -65,7 +64,7 @@ export type RoutePatternRefusal = (typeof ROUTE_PATTERN_REFUSALS)[number]
  * Whether a manifest pattern is one this matcher can read, and what is wrong with it if not.
  *
  * One rest segment, trailing, is the shape expo-router's own file system can produce and the only
- * one this reads. Anything else is refused by name and matches nothing, so its route stays native
+ * one this reads. Anything else is refused by name and matches nothing, so its route is not served
  * — the same answer a phone too old to have heard of rest segments gives, and the answer a shell
  * should give for a pattern whose tail it cannot say it understood.
  *
@@ -124,8 +123,8 @@ export function matchesRoutePattern(pathname: string, pattern: string): boolean 
 /**
  * The routes this shell will render from the page: listed, and needing nothing it lacks.
  *
- * `every` and not `some`: one grant this build lacks takes the whole route native, so a token every
- * page route declares couples the whole set to a shell that carries it — `haptics` is the first,
+ * `every` and not `some`: one grant this build lacks leaves the whole route unserved, so a token
+ * every page route declares couples the whole set to a shell that carries it — `haptics` is the first,
  * and against a shell without it no page route is served at all.
  */
 function implementedPageRouteEntries(
@@ -149,25 +148,6 @@ function implementedPageRouteEntries(
  */
 function effectiveRouteGrants(route: MobileWebPageRoute): string[] {
   return [...route.grants, ...(route.optionalGrants ?? [])].filter(implementsGrant)
-}
-
-/** The patterns alone, for the readers in this module that only name routes. */
-function implementedPageRoutes(routes: readonly MobileWebPageRoute[] | undefined): string[] {
-  return implementedPageRouteEntries(routes).map((route) => route.pathname)
-}
-
-/**
- * Whether the page renders this route, rather than the native screen.
- *
- * Both halves are the negotiation: the desktop lists what it has proved on the web, and the shell
- * answers for what it can do. Either side saying no leaves the route native, which is where every
- * route starts and what every phone already ships.
- */
-export function pageRendersRoute(
-  routes: readonly MobileWebPageRoute[] | undefined,
-  pathname: string
-): boolean {
-  return implementedPageRoutes(routes).some((pattern) => matchesRoutePattern(pathname, pattern))
 }
 
 /**
@@ -292,7 +272,8 @@ function servesWideLayout(
 }
 
 /**
- * Why the page will not serve a route `routeViewOf` left out, as a wall the shell shows.
+ * Why the page will not serve a route `routeViewOf` left out, as a wall the shell shows, or null
+ * when a declared pattern this shell cannot read might have covered it and no side can be blamed.
  *
  * Split on whether a shell implementing every grant would serve it: if so the page is ahead of this
  * app, and otherwise the desktop's page predates the screen.
@@ -305,8 +286,11 @@ export function pageRouteRefusalVerdict(
   routes: readonly MobileWebPageRoute[] | undefined,
   pathname: string,
   wide: boolean
-): PageRouteRefusalVerdict {
+): PageRouteRefusalVerdict | null {
   const declared = routes ?? []
+  if (declared.some((route) => routePatternRefusal(route.pathname) !== null)) {
+    return null
+  }
   const servedWithEveryGrant =
     servesWideLayout(declared, pathname, wide) &&
     declared.some((route) => matchesRoutePattern(pathname, route.pathname))

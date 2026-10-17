@@ -9,9 +9,10 @@ import { shellSwitchDecision } from './shell-switch-decision'
  * Any host-scoped pathname this app has no route file for, handed to the shell.
  *
  * The only switch with no native screen behind it: a screen registered after this app shipped is in
- * the desktop's bundle and nowhere else, so `fallback` is a refusal rather than a panel. A pathname
- * the bundle does not list is the shell's desktop-too-old wall, so the refusal is reached only on a
- * native-shell build.
+ * the desktop's bundle and nowhere else, so a native-shell build gets a refusal rather than a panel.
+ * `appNamesRoute={false}` gives a pathname the bundle does not serve that same refusal from the
+ * shell: with no screen for it here, nothing says the desktop is the one behind (a stale deep link
+ * looks the same).
  *
  * Least specific of everything in its directory, so it takes only what expo-router would otherwise
  * send to Unmatched; every route that has a file keeps it, on both platforms.
@@ -70,15 +71,15 @@ export default function MobileWebPageCatchAllScreen() {
   // left behind.
   //
   // The shell's own states, not the refusal: offline means the bundle that would serve it cannot be
-  // fetched, `checking` means the answer is not in yet, and the wall means this host's page cannot
-  // serve it. Absorbing those would tell someone with no connection that the screen does not exist.
+  // fetched, `checking` means the answer is not in yet, and a wall means no page can be served at
+  // all. Absorbing those would tell someone with no connection that the screen does not exist.
   // `catch-all-page-route-states.test.tsx` drives them.
   return (
     <MobileWebShellScreen
       key={shellScreenRouteKey(decision.route)}
       hostId={hostId}
       route={decision.route}
-      fallback={refusal}
+      appNamesRoute={false}
     />
   )
 }

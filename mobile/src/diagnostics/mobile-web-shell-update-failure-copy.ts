@@ -63,6 +63,8 @@ function outcomeCopy(failure: MobileWebShellUpdateFailure): string {
         : `Blocked: ${WALL_COPY[failure.wall]}.`
     case 'native-route':
       return 'Showed the native screen.'
+    case 'route-unavailable':
+      return 'Showed that the screen is not available.'
     case 'failed':
       return 'Showed the failure screen.'
     case 'waiting':

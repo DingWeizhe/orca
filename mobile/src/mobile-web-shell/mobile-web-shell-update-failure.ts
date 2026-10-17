@@ -69,7 +69,9 @@ export function updateFailureCauseOf(error: unknown): MobileWebShellUpdateFailur
 /** What the shell put on screen instead of the generation it could not take. */
 export const MOBILE_WEB_SHELL_UPDATE_FAILURE_OUTCOMES = [
   'opened-cached',
+  // Written by builds that still fell back to native screens; kept so their records still read.
   'native-route',
+  'route-unavailable',
   'wall',
   'failed',
   'waiting'

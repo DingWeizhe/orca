@@ -104,9 +104,9 @@ export type MobileWebShellSessionState =
       readonly totalBytes: number
       readonly elapsedMs: number
     }
-  /** The caller renders its native screen. Nothing produces it any more: a desktop that cannot serve
-   *  the route is walled. Kept only while the switches still carry the native screens. */
-  | { readonly kind: 'native-route' }
+  /** The page does not serve this screen and neither app can be named as the one to update: a
+   *  pathname this app has no screen for, or a manifest pattern this shell cannot read. */
+  | { readonly kind: 'route-unavailable' }
   | { readonly kind: 'wall'; readonly verdict: MobileWebShellBlockedVerdict }
   | {
       readonly kind: 'failed'
@@ -218,6 +218,9 @@ export type MobileWebShellSessionEvent =
 export type MobileWebShellSession = {
   /** The concrete route this session was opened for, matched against what the bundle lists. */
   readonly routePathname: string
+  /** False for the catch-all's pathnames: with no screen of its own here, an unserved one is not
+   *  evidence of an older desktop. */
+  readonly appNamesRoute: boolean
   /** A wide layout: served only under `canOwnHostArea`; the host route gets every route's grants. */
   readonly wide: boolean
   /** The route list the view below was built from, so a layout-class change can rebuild it. */

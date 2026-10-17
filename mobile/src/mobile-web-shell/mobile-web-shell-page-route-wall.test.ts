@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { MANIFEST, afterCacheRead, run } from './mobile-web-shell-session-test-fixtures'
+import {
+  MANIFEST,
+  afterCacheRead,
+  createMobileWebShellSession,
+  gates,
+  run
+} from './mobile-web-shell-session-test-fixtures'
 
 const UNLISTED_WALL = { kind: 'wall', verdict: { kind: 'blocked', reason: 'page-route-unlisted' } }
 
@@ -56,5 +62,35 @@ describe('a manifest whose page does not serve this route walls instead of going
       kind: 'wall',
       verdict: { reason: 'bundle-incompatible', side: 'desktop', pageVersion: 0 }
     })
+  })
+
+  it('says the screen is unavailable, not the desktop too old, for a pathname this app has no screen for', () => {
+    const opened = run(
+      createMobileWebShellSession('/h/host-1/insights', false, false),
+      { type: 'gates-changed', gates: gates() },
+      { type: 'cache-read', generation: null }
+    )
+    const step = run(opened.session, { type: 'manifest-read', manifest: MANIFEST })
+    expect(step.session.state).toEqual({ kind: 'route-unavailable' })
+  })
+
+  it('says the screen is unavailable when the manifest carries a pattern this shell cannot read', () => {
+    const step = run(afterCacheRead(null).session, {
+      type: 'manifest-read',
+      manifest: { ...MANIFEST, routes: [{ pathname: '/h/[...a]/[...b]', grants: [] }] }
+    })
+    expect(step.session.state).toEqual({ kind: 'route-unavailable' })
+  })
+
+  it('keeps that answer across a layout flip, which rebuilds the session', () => {
+    const opened = run(
+      createMobileWebShellSession('/h/host-1/insights', false, false),
+      { type: 'gates-changed', gates: gates() },
+      { type: 'cache-read', generation: null },
+      { type: 'manifest-read', manifest: MANIFEST }
+    )
+    expect(run(opened.session, { type: 'layout-changed', wide: true }).session.appNamesRoute).toBe(
+      false
+    )
   })
 })
