@@ -20,10 +20,7 @@ import { agentSessionFailureFact } from '../../../shared/agent-session-failure'
 import type { AgentSessionFailureWordsContext } from '../../../shared/agent-session-failure-words'
 import type { StructuredAgentSessionAdapter } from './structured-agent-session-adapter'
 import type { StructuredAgentRegistry } from './structured-agent-registry'
-import {
-  structuredAgentSessionStartFailure,
-  type StructuredAgentSessionStartFailureCause
-} from './structured-agent-session-failure-text'
+import { structuredAgentSessionStartFailure } from './structured-agent-session-failure-text'
 import type { StructuredAgentSessionResumeOutcome } from './structured-agent-session-agent-start'
 import type {
   StructuredAgentSessionHostSession,
@@ -104,7 +101,7 @@ type Prepared =
     }
 
 /** A failed start before it is worded; `fail` words it once, through the one wording point. */
-type StartFailure = { startKey: string | null; cause: StructuredAgentSessionStartFailureCause }
+type StartFailure = NonNullable<ReturnType<typeof startThatFailedWhileQueued>>
 
 export class StructuredAgentSessionDeliveryLoop {
   private readonly running = new Set<string>()

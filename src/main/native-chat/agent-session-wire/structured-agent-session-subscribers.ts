@@ -1,5 +1,4 @@
 import type { CurrentRequestsSubscriber } from './agent-session-current-requests'
-import type { AgentSessionPublishedWork } from './agent-session-published-work'
 // Per-subscriber cursors over one session's journal.
 //
 // Each subscriber advances independently: a client that connected two epochs
@@ -20,7 +19,10 @@ import {
   type SubscriberFieldHooks
 } from './agent-session-subscriber-frame-fields'
 import type { QueuePublication } from './structured-agent-session-queued-publication'
-import { deliverToSubscriber } from './agent-session-subscriber-catch-up'
+import {
+  deliverToSubscriber,
+  type SubscriberDeliveryPort
+} from './agent-session-subscriber-catch-up'
 import type { AgentSessionJournal } from '../agent-session-journal/journal-store'
 import { emptyAgentSessionBatch } from './agent-session-empty-batch'
 import { readAgentSessionHydrationPage } from './agent-session-history-page'
@@ -124,10 +126,7 @@ export class AgentSessionSubscribers {
     if (input.cursor) {
       this.deliver(subscriber, input.journal, hostNow, true)
       refreshDerivedStopNotes(
-        {
-          emit: (target, event, options) => this.emit(target, event, options),
-          isActive: (target) => this.isActive(target)
-        },
+        this.deliveryPort(),
         subscriber,
         input.journal,
         hostNow,
@@ -156,7 +155,7 @@ export class AgentSessionSubscribers {
         { currentWork: work }
       )
       subscriber.cursor = page.liveCursor ?? page.window.nextCursor
-      this.refreshWork(subscriber, input.journal, hostNow, work)
+      refreshPublishedWork(this.deliveryPort(), subscriber, input.journal, work, { hostNow })
     }
     const { sessionId, id } = subscriber
     return () => this.close(sessionId, id)
@@ -243,7 +242,7 @@ export class AgentSessionSubscribers {
       )
       subscriber.cursor = page.liveCursor ?? page.window.nextCursor
       subscriber.fence = fence
-      this.refreshWork(subscriber, journal, hostNow, work)
+      refreshPublishedWork(this.deliveryPort(), subscriber, journal, work, { hostNow })
     }
     this.hooks.onJournalPublished?.(sessionId, journal)
   }
@@ -303,31 +302,20 @@ export class AgentSessionSubscribers {
     activity?: AgentSessionTurnActivity | null
   ): void {
     deliverToSubscriber(
-      {
-        hooks: this.hooks,
-        emit: (target, event, options) => this.emit(target, event, options),
-        isActive: (target) => this.isActive(target),
-        activity: (sessionId) => this.activityField(sessionId).activity
-      },
+      this.deliveryPort(),
       { subscriber, journal, hostNow, emitCheckpoint, activity }
     )
   }
 
   private now = (): number => this.hooks.now?.() ?? Date.now()
 
-  private refreshWork(
-    subscriber: Subscriber,
-    journal: AgentSessionJournal,
-    hostNow: number,
-    work: AgentSessionPublishedWork | undefined
-  ): void {
-    refreshPublishedWork(
-      { emit: (target, event, options) => this.emit(target, event, options), isActive: this.isActive },
-      subscriber,
-      journal,
-      work,
-      { hostNow }
-    )
+  private deliveryPort(): SubscriberDeliveryPort {
+    return {
+      hooks: this.hooks,
+      emit: (target, event, options) => this.emit(target, event, options),
+      isActive: this.isActive,
+      activity: (sessionId) => this.activityField(sessionId).activity
+    }
   }
 
   private isActive = (subscriber: Subscriber): boolean =>
@@ -338,10 +326,7 @@ export class AgentSessionSubscribers {
   private emit(
     subscriber: Subscriber,
     event: AgentSessionSubscribeEvent,
-    options?: {
-      withholdQueued?: boolean
-      currentWork?: AgentSessionPublishedWork
-    }
+    options?: Parameters<SubscriberDeliveryPort['emit']>[2]
   ): void {
     try {
       emitSubscriberFrame(this.hooks, subscriber, event, options)
