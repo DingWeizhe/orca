@@ -83,6 +83,7 @@ export type StructuredAgentSessionDeliveryLoopDeps = {
   /** What is current changed with no row (`publishGenerationEnded`). */
   workChanged?: (sessionId: string) => void
   readChildWork: (sessionId: string) => readonly AgentChildWorkView[] | undefined
+  childWorkOpen: (sessionId: string) => boolean
   /** A person's Stop is still ending the session's work: the status feed's own reading. */
   stopping: (sessionId: string) => boolean
   now: () => number
@@ -317,6 +318,7 @@ export class StructuredAgentSessionDeliveryLoop {
         record: () => this.deps.record(sessionId),
         currentWork: () => this.deps.currentWork(sessionId),
         childWork: () => this.deps.readChildWork(sessionId),
+        childWorkOpen: () => this.deps.childWorkOpen(sessionId),
         now: this.deps.now,
         workChanged: () => this.deps.workChanged?.(sessionId)
       },
