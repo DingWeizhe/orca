@@ -220,8 +220,7 @@ export function routeViewOf(
 ) {
   const entries = implementedPageRouteEntries(routes)
   const root = hostAreaRoot(pathname)
-  // Native unless the page declares it: an older page draws its own sidebar beside the native one.
-  if (wide && (root === null || !pageCanOwnHostArea(entries, root))) {
+  if (!servesWideLayout(entries, pathname, wide)) {
     return { pageRoutes: [], pageRouteGrants: [], routeGrants: [], ownsHostArea: false }
   }
   const ownsHostArea = wide && pathname === root
@@ -279,6 +278,42 @@ function pageCanOwnHostArea(entries: readonly MobileWebPageRoute[], root: string
   return entries.some(
     (route) => route.canOwnHostArea === true && matchesRoutePattern(root, route.pathname)
   )
+}
+
+/** Wide sessions need a page that draws the host area: an older page draws its own sidebar beside
+ *  the native one. */
+function servesWideLayout(
+  entries: readonly MobileWebPageRoute[],
+  pathname: string,
+  wide: boolean
+): boolean {
+  const root = hostAreaRoot(pathname)
+  return !wide || (root !== null && pageCanOwnHostArea(entries, root))
+}
+
+/**
+ * Why the page will not serve a route `routeViewOf` left out, as a wall the shell shows.
+ *
+ * Split on whether a shell implementing every grant would serve it: if so the page is ahead of this
+ * app, and otherwise the desktop's page predates the screen.
+ */
+export type PageRouteRefusalVerdict =
+  | { readonly kind: 'blocked'; readonly reason: 'page-route-unlisted' }
+  | { readonly kind: 'blocked'; readonly reason: 'page-route-grant-missing' }
+
+export function pageRouteRefusalVerdict(
+  routes: readonly MobileWebPageRoute[] | undefined,
+  pathname: string,
+  wide: boolean
+): PageRouteRefusalVerdict {
+  const declared = routes ?? []
+  const servedWithEveryGrant =
+    servesWideLayout(declared, pathname, wide) &&
+    declared.some((route) => matchesRoutePattern(pathname, route.pathname))
+  return {
+    kind: 'blocked',
+    reason: servedWithEveryGrant ? 'page-route-grant-missing' : 'page-route-unlisted'
+  }
 }
 
 /** Every served route's grants, so `route-handoff.web.ts` keeps each hop in the page, plus the read

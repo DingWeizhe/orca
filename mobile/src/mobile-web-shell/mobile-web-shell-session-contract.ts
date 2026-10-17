@@ -1,5 +1,5 @@
 import type { MobileWebShellFailureReason } from '../../modules/orca-mobile-web-shell/src/load-state'
-import type { MobileWebPageRoute } from './page-route-policy'
+import type { MobileWebPageRoute, PageRouteRefusalVerdict } from './page-route-policy'
 import type {
   MobileWebBundleCompatManifest,
   MobileWebBundleCompatVerdict,
@@ -39,7 +39,7 @@ export type MobileWebShellManifestFacts = MobileWebBundleCompatManifest & {
   readonly buildId: string
   readonly totalBytes: number
   readonly totalAssets: number
-  /** Undefined for a desktop older than the field, which is every route staying native. */
+  /** Undefined for a desktop older than the field, which serves no route. */
   readonly routes: readonly MobileWebPageRoute[] | undefined
 }
 
@@ -57,10 +57,9 @@ export type CachedGeneration = {
   readonly compat: MobileWebBundleCompatManifest
 }
 
-export type MobileWebShellBlockedVerdict = Extract<
-  MobileWebBundleCompatVerdict,
-  { kind: 'blocked' }
->
+export type MobileWebShellBlockedVerdict =
+  | Extract<MobileWebBundleCompatVerdict, { kind: 'blocked' }>
+  | PageRouteRefusalVerdict
 
 /** The shell's own failures plus the one the view cannot report: a download or a cache write that
  *  never produced a generation to hand it. */
@@ -105,13 +104,8 @@ export type MobileWebShellSessionState =
       readonly totalBytes: number
       readonly elapsedMs: number
     }
-  /**
-   * This route is the native screen's, and the caller renders it.
-   *
-   * Either the bundle does not list the route, or it lists it needing a grant this shell does not
-   * implement, or the desktop ships no bundle at all. Not a failure and not a wall: every route
-   * starts native, and the negotiation saying no leaves it where it was.
-   */
+  /** The caller renders its native screen. Nothing produces it any more: a desktop that cannot serve
+   *  the route is walled. Kept only while the switches still carry the native screens. */
   | { readonly kind: 'native-route' }
   | { readonly kind: 'wall'; readonly verdict: MobileWebShellBlockedVerdict }
   | {

@@ -229,7 +229,7 @@ function transitionLine(
         : null
     case 'ready':
     case 'native-route':
-      // `ready` is logged at paint; native is every native screen's normal outcome.
+      // `ready` is logged at paint; `native-route` is no longer produced.
       return null
     case 'wall': {
       const side = 'side' in after.verdict ? ` side=${after.verdict.side}` : ''

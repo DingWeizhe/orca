@@ -6,6 +6,7 @@ import {
   pageRendersRoute,
   MOBILE_WEB_SHELL_GRANTS,
   grantsForRoute,
+  pageRouteRefusalVerdict,
   routePatternRefusal,
   routeViewOf
 } from './page-route-policy'
@@ -590,5 +591,31 @@ describe('a shell whose policy has never heard of the optional lane', () => {
     // The control: same manifest, this build's policy, one more grant. Without it the arms above
     // are also what a policy that ignored the lane entirely would report.
     expect(grantsForRoute(written, opened)).toEqual(['navigate', 'storage', 'screencastBinary'])
+  })
+})
+
+describe('why the page does not serve a route', () => {
+  const reasonFor = (...args: Parameters<typeof pageRouteRefusalVerdict>) =>
+    pageRouteRefusalVerdict(...args).reason
+
+  it('blames the desktop for a route its page does not list, or a page without routes', () => {
+    expect(reasonFor([{ pathname: '/h/[hostId]', grants: [] }], '/h/a/tasks', false)).toBe(
+      'page-route-unlisted'
+    )
+    expect(reasonFor(undefined, '/h/a', false)).toBe('page-route-unlisted')
+  })
+
+  it('blames this app for a listed route needing a grant it does not implement', () => {
+    expect(reasonFor([{ pathname: '/h/[hostId]', grants: ['teleport'] }], '/h/a', false)).toBe(
+      'page-route-grant-missing'
+    )
+  })
+
+  it('blames the desktop on a wide layout when its page cannot own the host area', () => {
+    const routes = [{ pathname: '/h/[hostId]', grants: [] }]
+    expect(reasonFor(routes, '/h/a', true)).toBe('page-route-unlisted')
+    expect(
+      reasonFor([{ ...routes[0]!, grants: ['teleport'], canOwnHostArea: true }], '/h/a', true)
+    ).toBe('page-route-grant-missing')
   })
 })
