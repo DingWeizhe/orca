@@ -602,7 +602,7 @@ describe('a shell whose policy has never heard of the optional lane', () => {
 
 describe('why the page does not serve a route', () => {
   const reasonFor = (...args: Parameters<typeof pageRouteRefusalVerdict>) =>
-    pageRouteRefusalVerdict(...args).reason
+    pageRouteRefusalVerdict(...args)?.reason
 
   it('blames the desktop on a wide layout when its page cannot own the host area', () => {
     const routes = [{ pathname: '/h/[hostId]', grants: [] }]
