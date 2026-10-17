@@ -84,6 +84,7 @@ function Probe({
     caret,
     resolveAttachmentOwner: owner,
     attachResolvedPaths: attachments.attachResolvedPaths,
+    attachCopiedFiles: () => {},
     beginPendingImageAttachment: attachments.beginPendingImageAttachment,
     resolvePendingImageAttachment: attachments.resolvePendingImageAttachment,
     revealPendingImageAttachment: attachments.revealPendingImageAttachment,
