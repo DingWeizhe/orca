@@ -187,6 +187,7 @@ function imagePasteEvent(text = ''): ClipboardEvent {
 
 beforeEach(() => {
   vi.resetAllMocks()
+  vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (X11; Linux x86_64)')
   mocks.readClipboardText.mockResolvedValue('')
   mocks.readClipboardImageThumbnail.mockResolvedValue(null)
   mocks.clipboardHasImage.mockResolvedValue(true)
@@ -800,6 +801,38 @@ describe('file-manager copies', () => {
     expect(insertTypedText).not.toHaveBeenCalled()
     expect(mocks.saveClipboardImageAsTempFile).not.toHaveBeenCalled()
   })
+
+  it.each([
+    ['a screenshot picture beside its saved file', '', false],
+    ['a Finder copy, whose clipboard text names the file', 'Screenshot.png', true]
+  ])(
+    'on macOS, holds a chip at once for %s, then lets the clipboard decide',
+    async (_label, nativeText, attachesFiles) => {
+      vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (Macintosh)')
+      mocks.getPathForFile.mockImplementation((file: File) => `/Users/me/Desktop/${file.name}`)
+      let finishRead: (text: string) => void = () => {}
+      mocks.readClipboardText.mockReturnValue(
+        new Promise<string>((resolve) => {
+          finishRead = resolve
+        })
+      )
+      mocks.saveClipboardImageAsTempFile.mockResolvedValue('/tmp/shot.png')
+      const attachCopiedFiles = vi.fn()
+      const store = createChipStore()
+      const probe = await renderProbe({
+        resolveAttachmentOwner: () => ({ kind: 'local' }),
+        attachCopiedFiles,
+        store
+      })
+      await act(async () => probe.latest().handlePaste(fileCopyEvent([png('Screenshot.png')], '')))
+      expect(store.chips).toEqual([expect.objectContaining({ pending: true })])
+      await act(async () => finishRead(nativeText))
+      expect(attachCopiedFiles).toHaveBeenCalledTimes(attachesFiles ? 1 : 0)
+      expect(store.chips).toEqual(
+        attachesFiles ? [] : [expect.objectContaining({ path: '/tmp/shot.png', pending: false })]
+      )
+    }
+  )
 
   describe('from the app menu (macOS Cmd+V)', () => {
     it.each([

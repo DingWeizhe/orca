@@ -94,23 +94,21 @@ function copiesOnlyFiles(text: string, filePaths: readonly string[]): boolean {
   return filePaths.length > 0 && (text === '' || textOnlyLabelsCopiedFiles(text, filePaths))
 }
 
-/** The clipboard's text for a paste with no event, and the files a file manager copied when
- *  the text only labels them. */
+/** The clipboard's text, and the files a file manager copied when the text only labels them.
+ *  `eventFilePaths`: the files a paste event already carried, instead of reading them again. */
 export async function readClipboardPasteText(
-  maxBytes: number
+  maxBytes: number,
+  eventFilePaths?: string[]
 ): Promise<{ text: string; copiedFilePaths: string[] }> {
   const [text, filePaths] = await Promise.all([
     window.api.ui.readClipboardText({ maxBytes }),
     // Without the file list the text is typed as-is.
-    window.api.ui.readClipboardFilePaths().catch(() => [])
+    eventFilePaths ?? window.api.ui.readClipboardFilePaths().catch(() => [])
   ])
   if (!copiesOnlyFiles(text, filePaths)) {
     return { text, copiedFilePaths: [] }
   }
-  // macOS lists a screenshot tool's saved file beside its picture; only a Finder copy also names it.
-  const picture =
-    text === '' &&
-    isMacPlatform() &&
-    (await window.api.ui.clipboardHasImage().catch(() => false)) === true
+  // macOS lists a screenshot tool's saved file beside its picture; only Finder also names files.
+  const picture = text === '' && isMacPlatform() && (await window.api.ui.clipboardHasImage())
   return { text, copiedFilePaths: picture ? [] : filePaths }
 }

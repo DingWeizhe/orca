@@ -5,6 +5,7 @@ import { assertClipboardTextWithinLimit } from '../../../../shared/clipboard-tex
 import { setNativeChatPasteFailure } from './native-chat-composer-notice'
 import { NATIVE_CHAT_CONTEXT_PASTE_MAX_BYTES } from './native-chat-composer-target'
 import { nativeChatPasteUnavailableNotice } from '@/lib/native-chat-paste-request'
+import { isMacPlatform } from './native-chat-shortcut'
 import {
   clipboardEventCopiedFilePaths,
   clipboardEventImageFile,
@@ -19,7 +20,7 @@ import {
 } from './native-chat-attachment-upload'
 import {
   ownerAcceptsClipboardImage,
-  saveNativeChatClipboardImage
+  saveNativeChatPastedClipboardImage
 } from './native-chat-clipboard-image-save'
 
 import type { UseNativeChatComposerPasteArgs } from './native-chat-composer-paste-options'
@@ -48,7 +49,7 @@ export function useNativeChatComposerPaste({
   useLayoutEffect(() => {
     disabledRef.current = disabled
   }, [disabled])
-  const { lifetime, track, startImageChip, keepStoreUploadAfterUnmount } =
+  const { lifetime, startImageChip, startClipboardImageChip, keepStoreUploadAfterUnmount } =
     useNativeChatPasteLifetime({
       targetKey,
       attachmentScopeKey,
@@ -72,34 +73,6 @@ export function useNativeChatComposerPaste({
       }
     },
     [lifetime, dropPendingImageAttachment]
-  )
-
-  // Image failures do not decide whether text can be inserted. Beside pasted text, a server too old
-  // to store the image drops only the image rendition, as an owner that takes no images does.
-  const saveClipboardImageForOwner = useCallback(
-    (
-      owner: NativeChatAttachmentOwner,
-      besidePastedText: () => Promise<boolean>,
-      ready?: () => void
-    ) =>
-      saveNativeChatClipboardImage(owner, {
-        ready,
-        setNotice: (notice, cause, errorText) => {
-          void (cause === 'serverTooOld' ? besidePastedText() : Promise.resolve(false)).then(
-            (quiet) => {
-              if (quiet || !canPaste()) {
-                return
-              }
-              if (errorText) {
-                setNotice(notice, errorText)
-              } else {
-                setNotice(notice)
-              }
-            }
-          )
-        }
-      }),
-    [canPaste, setNotice]
   )
 
   /** Settle the operation started at paste time, or attach directly if chips are unavailable. */
@@ -127,6 +100,33 @@ export function useNativeChatComposerPaste({
     ]
   )
 
+  // Image failures do not decide whether text can be inserted. Resolves whether the image settled.
+  const saveClipboardImage = useCallback(
+    async (
+      owner: NativeChatAttachmentOwner,
+      pendingId: string | null,
+      besideText: boolean,
+      ready?: () => void
+    ): Promise<boolean> => {
+      const saved = await saveNativeChatPastedClipboardImage(owner, {
+        besideText,
+        ready,
+        canNotify: canPaste,
+        setNotice
+      })
+      if (keepStoreUploadAfterUnmount(pendingId, saved)) {
+        return false
+      }
+      if (!canPaste() || saved.status !== 'saved') {
+        dropImagePaste(pendingId)
+        return false
+      }
+      settleImagePaste(pendingId, saved.tempPath, owner)
+      return true
+    },
+    [canPaste, dropImagePaste, keepStoreUploadAfterUnmount, setNotice, settleImagePaste]
+  )
+
   const handlePaste = useCallback(
     (event: ClipboardEventLike) => {
       // Dedupe: the pane-level capture listener runs first and preventDefaults
@@ -148,6 +148,39 @@ export function useNativeChatComposerPaste({
         return
       }
       setNotice(null)
+      const macOwner =
+        copiesFiles && isMacPlatform() && clipboardEventImageFile(event)
+          ? resolveAttachmentOwner()
+          : null
+      // This event hides Finder's file names, so the native clipboard tells a file copy from a
+      // screenshot's picture; the chip holds Send meanwhile.
+      if (macOwner && ownerAcceptsClipboardImage(macOwner)) {
+        const { id: pendingId, reveal } = startClipboardImageChip(macOwner)
+        void readClipboardPasteText(NATIVE_CHAT_CONTEXT_PASTE_MAX_BYTES, copiedFilePaths).then(
+          (read) => {
+            if (read.copiedFilePaths.length === 0) {
+              if (read.text && canPaste()) {
+                insertTypedText(read.text)
+              }
+              reveal()
+              void saveClipboardImage(macOwner, pendingId, read.text !== '')
+              return
+            }
+            // The drop route reserves its own chips before this one goes, so Send stays held.
+            if (canPaste()) {
+              attachCopiedFiles(read.copiedFilePaths, { focus: false })
+            }
+            dropImagePaste(pendingId)
+          },
+          (error) => {
+            dropImagePaste(pendingId)
+            if (canPaste()) {
+              setNativeChatPasteFailure(setNotice, error)
+            }
+          }
+        )
+        return
+      }
       if (copiesFiles) {
         attachCopiedFiles(copiedFilePaths, { focus: false })
         return
@@ -183,24 +216,16 @@ export function useNativeChatComposerPaste({
         deferPreview: awaitServer,
         canShow: () => ownerAcceptsClipboardImage(owner) && canPaste()
       })
-      void (async () => {
-        const saved = await saveClipboardImageForOwner(
-          owner,
-          async () => Boolean(text),
-          awaitServer ? reveal : undefined
-        )
-        if (keepStoreUploadAfterUnmount(pendingId, saved)) {
-          return
-        }
-        if (saved.status !== 'saved' || !canPaste()) {
-          dropImagePaste(pendingId)
-          return
-        }
-        settleImagePaste(pendingId, saved.tempPath, owner)
-        if (!text) {
+      void saveClipboardImage(
+        owner,
+        pendingId,
+        Boolean(text),
+        awaitServer ? reveal : undefined
+      ).then((settled) => {
+        if (settled && !text) {
           setCaret(caretAtPaste)
         }
-      })()
+      })
     },
     [
       attachCopiedFiles,
@@ -210,12 +235,11 @@ export function useNativeChatComposerPaste({
       insertTypedText,
       showPasteUnavailable,
       resolveAttachmentOwner,
-      keepStoreUploadAfterUnmount,
       startImageChip,
-      saveClipboardImageForOwner,
+      startClipboardImageChip,
+      saveClipboardImage,
       setCaret,
-      setNotice,
-      settleImagePaste
+      setNotice
     ]
   )
 
@@ -277,42 +301,19 @@ export function useNativeChatComposerPaste({
         return
       }
       // Ownership starts before saving; a thumbnail only supplies its preview.
-      const pendingId = beginPendingImageAttachment(undefined, undefined, owner.kind === 'remote')
-      if (pendingId) {
-        track(pendingId, '', owner)
-      }
-      void window.api.ui
-        .readClipboardImageThumbnail()
-        .catch(() => null)
-        .then((thumbnail) => {
-          if (pendingId && thumbnail) {
-            revealPendingImageAttachment?.(pendingId, thumbnail.dataUrl)
-          }
-        })
-      const saved = await saveClipboardImageForOwner(owner, async () => Boolean(read?.text))
-      if (keepStoreUploadAfterUnmount(pendingId, saved)) {
-        return
-      }
-      if (!canPaste() || saved.status !== 'saved') {
-        dropImagePaste(pendingId)
-        return
-      }
-      settleImagePaste(pendingId, saved.tempPath, owner)
+      const { id: pendingId, reveal } = startClipboardImageChip(owner)
+      reveal()
+      await saveClipboardImage(owner, pendingId, Boolean(read?.text))
     })()
   }, [
     attachCopiedFiles,
-    beginPendingImageAttachment,
-    revealPendingImageAttachment,
     canPaste,
-    dropImagePaste,
     insertTypedText,
-    keepStoreUploadAfterUnmount,
-    track,
+    startClipboardImageChip,
+    saveClipboardImage,
     showPasteUnavailable,
     resolveAttachmentOwner,
-    saveClipboardImageForOwner,
-    setNotice,
-    settleImagePaste
+    setNotice
   ])
 
   return { handlePaste, pasteFromClipboard }

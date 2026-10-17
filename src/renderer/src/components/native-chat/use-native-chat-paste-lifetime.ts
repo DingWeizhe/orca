@@ -27,6 +27,11 @@ export function useNativeChatPasteLifetime(args: {
     imageFile: Blob,
     options: { deferPreview: boolean; canShow: () => boolean }
   ) => { id: string | null; reveal: () => void }
+  /** Register the operation for the native clipboard's picture; `reveal` previews its thumbnail. */
+  startClipboardImageChip: (owner: NativeChatAttachmentOwner) => {
+    id: string | null
+    reveal: () => void
+  }
   keepStoreUploadAfterUnmount: (
     pendingId: string | null,
     saved: { status: string; tempPath?: string }
@@ -125,6 +130,26 @@ export function useNativeChatPasteLifetime(args: {
     },
     [attachmentScopeKey, beginPendingImageAttachment, lifetime, revealPendingImageAttachment, track]
   )
+  const startClipboardImageChip = useCallback(
+    (owner: NativeChatAttachmentOwner): { id: string | null; reveal: () => void } => {
+      const id = beginPendingImageAttachment(undefined, undefined, owner.kind === 'remote')
+      if (id) {
+        track(id, '', owner)
+      }
+      const reveal = (): void => {
+        void window.api.ui
+          .readClipboardImageThumbnail()
+          .catch(() => null)
+          .then((thumbnail) => {
+            if (id && thumbnail) {
+              revealPendingImageAttachment?.(id, thumbnail.dataUrl)
+            }
+          })
+      }
+      return { id, reveal }
+    },
+    [beginPendingImageAttachment, revealPendingImageAttachment, track]
+  )
   const keepStoreUploadAfterUnmount = useCallback(
     (pendingId: string | null, saved: { status: string; tempPath?: string }): boolean => {
       if (!pendingId || lifetime.active) {
@@ -156,5 +181,5 @@ export function useNativeChatPasteLifetime(args: {
     },
     [attachmentScopeKey, dropPendingImageAttachment, lifetime, resolvePendingImageAttachment]
   )
-  return { lifetime, track, startImageChip, keepStoreUploadAfterUnmount }
+  return { lifetime, track, startImageChip, startClipboardImageChip, keepStoreUploadAfterUnmount }
 }
