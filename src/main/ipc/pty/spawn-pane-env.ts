@@ -34,6 +34,7 @@ export function ptySpawnPaneFromIds(ids: {
 type PtySpawnPaneEnvArgs = {
   /** Null when the spawn's own tab+leaf ids don't name a valid pane. */
   pane: PtySpawnPane | null
+  jcodeRuntimeDir: string | undefined
   isDaemonHostSpawn: boolean
   launchAgent: TuiAgent | undefined
   cwd: string | undefined
@@ -68,36 +69,40 @@ export function stampPtySpawnPaneEnv(
   } else {
     delete env.ORCA_WORKTREE_ID
   }
-  // Why: jcode runs one server/client daemon per runtime dir, so a per-pane
-  // dir keeps every PTY on its own daemon (hooks inherit the pane key instead
-  // of the first pane's). Local unix sockets only.
-  const jcodeEnv = buildJcodeRuntimeDirEnv(pane.paneKey)
-  if (!jcodeEnv) {
+  // A failed managed-dir preparation must leave a working caller directory intact.
+  if (args.jcodeRuntimeDir === undefined) {
     return
   }
-  // Why: LocalPtyProvider.spawn creates the dir async; daemon-host spawns
-  // skip that provider, so ensure sync here — an extra await before
-  // provider.spawn would reorder the pane-spawn reservation race.
-  if (args.isDaemonHostSpawn) {
-    try {
-      mkdirSync(jcodeEnv[JCODE_RUNTIME_DIR_ENV_KEY], { recursive: true })
-    } catch {
-      // Why non-fatal: this dir is stamped on every local pane, so an EACCES on
-      // a shared /tmp/orca-jcode or a read-only TMPDIR would stop a plain shell
-      // from opening. Without it jcode falls back to its own default daemon.
-      return
-    }
-  }
-  Object.assign(env, jcodeEnv)
+  env[JCODE_RUNTIME_DIR_ENV_KEY] = args.jcodeRuntimeDir
   // Why here too: daemon-host spawns never reach LocalPtyProvider.spawn, so
   // without this the pre-warm — the whole point of which is to beat jcode's
   // 5s socket budget on a cold runtime dir — would not fire for those panes.
   if (args.isDaemonHostSpawn && args.prewarmsJcodeOnDaemonHost) {
     prewarmJcodeDaemon({
       launchAgent: args.launchAgent,
-      runtimeDir: jcodeEnv[JCODE_RUNTIME_DIR_ENV_KEY],
+      runtimeDir: args.jcodeRuntimeDir,
       cwd: args.cwd,
       env
     })
   }
+}
+
+/** Window local providers validate asynchronously; daemon spawns retain their synchronous preparation. */
+export function selectWindowJcodeRuntimeDir(
+  paneKey: string,
+  isDaemonHostSpawn: boolean
+): string | undefined {
+  const runtimeDir = buildJcodeRuntimeDirEnv(paneKey)?.[JCODE_RUNTIME_DIR_ENV_KEY]
+  if (runtimeDir === undefined) {
+    return undefined
+  }
+  if (isDaemonHostSpawn) {
+    try {
+      mkdirSync(runtimeDir, { recursive: true })
+    } catch {
+      // Directory failure must not prevent an ordinary shell from opening.
+      return undefined
+    }
+  }
+  return runtimeDir
 }

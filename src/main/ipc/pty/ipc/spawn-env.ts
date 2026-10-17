@@ -10,7 +10,7 @@ import { resolvePathEnvKey } from '../../../pty/windows-environment-path'
 import { routesFreshSpawnsToLocalProvider } from '../host-env/fresh-spawn-routing'
 import { parseValidPaneKey } from '../pane/key-state'
 import { shouldRefreshNativeClaudeAgentTeamsEnv } from '../pane/launch-authority'
-import { stampPtySpawnPaneEnv } from '../spawn-pane-env'
+import { selectWindowJcodeRuntimeDir, stampPtySpawnPaneEnv } from '../spawn-pane-env'
 import type { PtyIpcSpawnState } from './spawn-state'
 import { assemblePtyIpcSpawnCodexEnv } from './spawn-env-codex'
 import { prepareAntigravityAccountForLaunch } from '../../../antigravity/native-account-launch'
@@ -108,6 +108,10 @@ export async function assemblePtyIpcSpawnEnv(ctx: PtyIpcSpawnState): Promise<voi
           worktreeId: typeof args.worktreeId === 'string' ? args.worktreeId : undefined
         }
       : null,
+    jcodeRuntimeDir:
+      ctx.baseEnv && ctx.stablePaneKey
+        ? selectWindowJcodeRuntimeDir(ctx.stablePaneKey, ctx.isDaemonHostSpawn)
+        : undefined,
     isDaemonHostSpawn: ctx.isDaemonHostSpawn,
     launchAgent: args.launchAgent,
     cwd: args.cwd,

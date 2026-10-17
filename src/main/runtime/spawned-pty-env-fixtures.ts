@@ -1,29 +1,27 @@
 import { ptySpawnPaneFromIds, stampPtySpawnPaneEnv } from '../ipc/pty/spawn-pane-env'
+import { buildJcodeRuntimeDirEnv, JCODE_RUNTIME_DIR_ENV_KEY } from '../../shared/jcode-runtime-dir'
 
-/** The env a fake `ptyController.spawn` call's PTY gets once the real spawn step stamps its own pane ids. */
+/** Reconstructs identity formulas from fake spawn args; wiring and directory readiness need real-path tests. */
 export function spawnedPtyEnv(call: unknown): Record<string, string> {
+  const values: Record<string, unknown> = typeof call === 'object' && call !== null ? { ...call } : {}
   const env: Record<string, string> = {}
-  const ids: { tabId?: string; leafId?: string; worktreeId?: string } = {}
-  if (typeof call === 'object' && call !== null) {
-    if ('env' in call && typeof call.env === 'object' && call.env !== null) {
-      for (const [key, value] of Object.entries(call.env)) {
-        if (typeof value === 'string') {
-          env[key] = value
-        }
+  if (typeof values.env === 'object' && values.env !== null) {
+    for (const [key, value] of Object.entries(values.env)) {
+      if (typeof value === 'string') {
+        env[key] = value
       }
     }
-    if ('tabId' in call && typeof call.tabId === 'string') {
-      ids.tabId = call.tabId
-    }
-    if ('leafId' in call && typeof call.leafId === 'string') {
-      ids.leafId = call.leafId
-    }
-    if ('worktreeId' in call && typeof call.worktreeId === 'string') {
-      ids.worktreeId = call.worktreeId
-    }
   }
+  const pane = ptySpawnPaneFromIds({
+    tabId: typeof values.tabId === 'string' ? values.tabId : undefined,
+    leafId: typeof values.leafId === 'string' ? values.leafId : undefined,
+    worktreeId: typeof values.worktreeId === 'string' ? values.worktreeId : undefined
+  })
   stampPtySpawnPaneEnv(env, {
-    pane: ptySpawnPaneFromIds(ids),
+    pane,
+    jcodeRuntimeDir: pane
+      ? buildJcodeRuntimeDirEnv(pane.paneKey)?.[JCODE_RUNTIME_DIR_ENV_KEY]
+      : undefined,
     isDaemonHostSpawn: false,
     launchAgent: undefined,
     cwd: undefined,
