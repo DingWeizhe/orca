@@ -29,7 +29,7 @@ export function buildConnectionDiagnosticsReport(args: {
   activePath?: MobileConnectionDiagnosticPath
   pendingPath?: MobileConnectionDiagnosticPath | null
   /** Which shell this binary is and the page bridge version it speaks; omitted by older callers. */
-  shell?: { kind: 'ota' | 'native'; bridgeProtocolVersion: number }
+  shell?: { kind: 'ota'; bridgeProtocolVersion: number }
   nowMs?: number
 }): string {
   const now = args.nowMs ?? Date.now()

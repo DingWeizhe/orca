@@ -1,9 +1,8 @@
 import { useLocalSearchParams } from 'expo-router'
 import { MobileWebShellScreen } from '../../../src/mobile-web-shell/MobileWebShellScreen'
 import { shellScreenRoute } from '../../../src/mobile-web-shell/shell-screen-route'
-import { shellSwitchDecision } from '../../../src/mobile-web-shell/shell-switch-decision'
+import { PageRouteUnavailableScreen } from '../../../src/mobile-web-shell/PageRouteUnavailableScreen'
 import { firstParam } from '../../../src/navigation/route-param-reader'
-import { MobileTasksScreen } from '../../../src/tasks/MobileTasksScreen'
 
 /**
  * The shell's switch for this route, in `index.tsx`'s shape.
@@ -21,7 +20,6 @@ export default function MobileTasksRoute() {
   }>()
   const hostId = firstParam(params.hostId)
   const taskSource = firstParam(params.taskSource)
-  const native = <MobileTasksScreen />
 
   const route = hostId
     ? shellScreenRoute({
@@ -31,10 +29,8 @@ export default function MobileTasksRoute() {
         ...(taskSource === '' ? {} : { params: { taskSource } })
       })
     : null
-  const decision = shellSwitchDecision(route)
-
-  if (decision.kind === 'native') {
-    return native
+  if (route === null) {
+    return <PageRouteUnavailableScreen hostId={hostId} />
   }
   return (
     <MobileWebShellScreen
@@ -42,7 +38,7 @@ export default function MobileTasksRoute() {
       // with, so a host id change must be a remount rather than a prop update.
       key={hostId}
       hostId={hostId}
-      route={decision.route}
+      route={route}
     />
   )
 }

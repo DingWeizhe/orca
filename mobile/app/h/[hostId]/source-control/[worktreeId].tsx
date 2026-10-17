@@ -4,18 +4,16 @@ import {
   workspaceRouteParams
 } from '../../../../src/navigation/workspace-execution-host'
 import { useLocalSearchParams } from 'expo-router'
-import { MobileSourceControlPanel } from '../../../../src/source-control/MobileSourceControlPanel'
 import { firstParam } from '../../../../src/navigation/route-param-reader'
-import { parseSourceControlHubTab } from '../../../../src/source-control/mobile-source-control-hub-tab'
 import {
   shellScreenRoute,
   shellScreenRouteKey
 } from '../../../../src/mobile-web-shell/shell-screen-route'
 import { MobileWebShellScreen } from '../../../../src/mobile-web-shell/MobileWebShellScreen'
-import { shellSwitchDecision } from '../../../../src/mobile-web-shell/shell-switch-decision'
+import { PageRouteUnavailableScreen } from '../../../../src/mobile-web-shell/PageRouteUnavailableScreen'
 
 /**
- * The source-control hub, from the desktop's bundle or from this app.
+ * The source-control hub, from the desktop's bundle.
  *
  * The files switch's shape, for its reasons: the shell walls a route the bundle does not list or
  * this app's grants do not cover.
@@ -41,16 +39,6 @@ export default withWorkspaceRoute(function MobileSourceControlScreen() {
   const name = firstParam(params.name)
   const origin = firstParam(params.origin)
   const tab = firstParam(params.tab)
-  const native = (
-    <MobileSourceControlPanel
-      hostId={hostId}
-      worktreeId={worktreeId}
-      name={name}
-      origin={origin}
-      initialTab={parseSourceControlHubTab(tab)}
-      embedded={false}
-    />
-  )
 
   // Each omitted rather than empty, and the whole record omitted when none of the three was named:
   // the panel derives its own label, origin and lens from the workspace when the caller named none,
@@ -70,19 +58,11 @@ export default withWorkspaceRoute(function MobileSourceControlScreen() {
         })
       : null
 
-  const decision = shellSwitchDecision(route)
-
-  if (decision.kind === 'native') {
-    return native
+  if (route === null) {
+    return <PageRouteUnavailableScreen hostId={hostId} />
   }
   // Keyed on the route: a host captures the grants its session was opened with, so a screen reused
   // across a route change would keep authorising frames under the grants of the route the page has
   // left. The key is what makes the change a remount, which disposes that bridge in the commit.
-  return (
-    <MobileWebShellScreen
-      key={shellScreenRouteKey(decision.route)}
-      hostId={hostId}
-      route={decision.route}
-    />
-  )
+  return <MobileWebShellScreen key={shellScreenRouteKey(route)} hostId={hostId} route={route} />
 })

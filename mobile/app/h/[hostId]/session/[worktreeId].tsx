@@ -5,22 +5,16 @@ import {
 } from '../../../../src/navigation/workspace-execution-host'
 import { useCallback } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { MobileSessionRouteScreen } from '../../../../src/session/MobileSessionRouteScreen'
 import { firstParam } from '../../../../src/navigation/route-param-reader'
 import {
   shellScreenRoute,
   shellScreenRouteKey
 } from '../../../../src/mobile-web-shell/shell-screen-route'
 import { MobileWebShellScreen } from '../../../../src/mobile-web-shell/MobileWebShellScreen'
-import { shellSwitchDecision } from '../../../../src/mobile-web-shell/shell-switch-decision'
+import { PageRouteUnavailableScreen } from '../../../../src/mobile-web-shell/PageRouteUnavailableScreen'
 
 /**
- * The session screen — terminal and chat — from the desktop's bundle or from this app.
- *
- * The review switch's shape, for its reasons: the native screen is `MobileSessionRouteScreen`
- * rather than the body of this file, because `useMobileSessionController` at this file's top level
- * would open the terminal, chat and tab subscriptions behind the page as well as in front of it.
- * As an element it is built and not mounted, and only a native-shell build mounts it.
+ * The session screen — terminal and chat — from the desktop's bundle.
  *
  * Four query params rather than the review's four, and one of them is not part of this screen's
  * identity: `paneKey`. A notification tap for a pane of the session already on screen is a tab
@@ -47,7 +41,6 @@ export default withWorkspaceRoute(function MobileSessionScreen() {
   const worktreeId = firstParam(params.worktreeId)
   const executionHost = useWorkspaceExecutionHost()
   const router = useRouter()
-  const native = <MobileSessionRouteScreen />
   const paneKey = firstParam(params.paneKey) ?? ''
   // The reader erasing its own request (ruling 34): the page applied a pane and names it back, and
   // this is where the param it came on lives. Compared rather than obeyed — a tap that moved on
@@ -85,10 +78,8 @@ export default withWorkspaceRoute(function MobileSessionScreen() {
         })
       : null
 
-  const decision = shellSwitchDecision(route)
-
-  if (decision.kind === 'native') {
-    return native
+  if (route === null) {
+    return <PageRouteUnavailableScreen hostId={hostId} />
   }
   // Keyed on the route minus `paneKey`: a host captures the grants its session was opened with, so
   // a screen reused across a route change would keep authorising frames under the grants of the
@@ -100,9 +91,9 @@ export default withWorkspaceRoute(function MobileSessionScreen() {
   const { paneKey: _paneKey, ...identity } = routeParams
   return (
     <MobileWebShellScreen
-      key={shellScreenRouteKey({ pathname: decision.route.pathname, params: identity })}
+      key={shellScreenRouteKey({ pathname: route.pathname, params: identity })}
       hostId={hostId}
-      route={decision.route}
+      route={route}
       onRouteParamClear={erasePaneKey}
     />
   )

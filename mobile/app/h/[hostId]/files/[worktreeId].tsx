@@ -4,20 +4,16 @@ import {
   workspaceRouteParams
 } from '../../../../src/navigation/workspace-execution-host'
 import { useLocalSearchParams } from 'expo-router'
-import { MobileFileExplorerPanel } from '../../../../src/files/MobileFileExplorerPanel'
 import { firstParam } from '../../../../src/navigation/route-param-reader'
 import {
   shellScreenRoute,
   shellScreenRouteKey
 } from '../../../../src/mobile-web-shell/shell-screen-route'
 import { MobileWebShellScreen } from '../../../../src/mobile-web-shell/MobileWebShellScreen'
-import { shellSwitchDecision } from '../../../../src/mobile-web-shell/shell-switch-decision'
+import { PageRouteUnavailableScreen } from '../../../../src/mobile-web-shell/PageRouteUnavailableScreen'
 
 /**
- * The file explorer, from the desktop's bundle or from this app.
- *
- * The shell decides, not this switch: it renders the page only for a route the bundle lists with
- * grants this app implements, and walls the host otherwise.
+ * The file explorer, from the desktop's bundle. The shell walls a host whose bundle cannot serve it.
  *
  * Encoded, not interpolated raw, for the reason `web.tsx` states: an id carrying `?`, `#` or
  * whitespace would build a pathname the page refuses and mount nothing.
@@ -40,9 +36,6 @@ export default withWorkspaceRoute(function MobileFileExplorerScreen() {
     ...(name === '' ? {} : { name }),
     ...workspaceRouteParams(executionHost)
   }
-  const native = (
-    <MobileFileExplorerPanel hostId={hostId} worktreeId={worktreeId} name={name} embedded={false} />
-  )
 
   const route =
     hostId && worktreeId
@@ -54,19 +47,11 @@ export default withWorkspaceRoute(function MobileFileExplorerScreen() {
         })
       : null
 
-  const decision = shellSwitchDecision(route)
-
-  if (decision.kind === 'native') {
-    return native
+  if (route === null) {
+    return <PageRouteUnavailableScreen hostId={hostId} />
   }
   // Keyed on the route: a host captures the grants its session was opened with, so a screen reused
   // across a route change would keep authorising frames under the grants of the route the page has
   // left. The key is what makes the change a remount, which disposes that bridge in the commit.
-  return (
-    <MobileWebShellScreen
-      key={shellScreenRouteKey(decision.route)}
-      hostId={hostId}
-      route={decision.route}
-    />
-  )
+  return <MobileWebShellScreen key={shellScreenRouteKey(route)} hostId={hostId} route={route} />
 })

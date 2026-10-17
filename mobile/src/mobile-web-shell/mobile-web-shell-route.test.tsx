@@ -1,6 +1,6 @@
 import { createElement } from 'react'
-import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, create, type ReactTestRenderer } from 'react-test-renderer'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 type RouteDependencies = {
   mounted: string[]
@@ -25,7 +25,6 @@ vi.mock('react-native', () => ({
 }))
 
 vi.mock('expo-router', () => ({
-  Redirect: 'Redirect',
   useLocalSearchParams: () => ({ hostId: dependencies.hostId })
 }))
 
@@ -39,12 +38,6 @@ vi.mock('./MobileWebShellScreen', () => ({
 
 import { BRIDGE_ROUTE_PATHNAME_PATTERN } from './bridge/bridge-caps'
 import MobileWebShellRoute from '../../app/h/[hostId]/web'
-
-/** Host elements are matched by name, not by `findAllByType`: React's `ElementType` does not admit
- *  an arbitrary React Native host name, so the typed form is a predicate. */
-function byName(tree: ReactTestRenderer, name: string): ReactTestInstance[] {
-  return tree.root.findAll((node) => String(node.type) === name)
-}
 
 async function renderRoute(): Promise<ReactTestRenderer> {
   const rendered: { tree: ReactTestRenderer | null } = { tree: null }
@@ -62,23 +55,10 @@ describe('the hybrid shell route', () => {
     dependencies.mounted.length = 0
     dependencies.pathnames.length = 0
     dependencies.hostId = 'host-1'
-    vi.stubEnv('EXPO_PUBLIC_MOBILE_SHELL', 'ota')
   })
 
-  afterEach(() => {
-    vi.unstubAllEnvs()
-  })
-
-  it('redirects to the host screen in a native build, and mounts nothing', async () => {
-    vi.stubEnv('EXPO_PUBLIC_MOBILE_SHELL', undefined)
-    const tree = await renderRoute()
-    expect(byName(tree, 'Redirect').map((node) => node.props.href)).toEqual(['/h/host-1'])
-    expect(dependencies.mounted).toEqual([])
-  })
-
-  it('mounts the shell screen for this host in an OTA build', async () => {
-    const tree = await renderRoute()
-    expect(byName(tree, 'Redirect')).toEqual([])
+  it('mounts the shell screen for this host', async () => {
+    await renderRoute()
     expect(dependencies.mounted).toEqual(['host-1'])
   })
 
