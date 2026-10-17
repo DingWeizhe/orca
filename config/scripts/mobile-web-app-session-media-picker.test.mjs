@@ -63,7 +63,7 @@ describeClosure(
           absent
         ).toEqual([])
       }
-      expect(closure.local).toContain('src/session/mobile-clipboard-image-resize.web.ts')
+      expect(closure.local).toContain('src/session/mobile-clipboard-image-resize.ts')
     })
 
     it('is big enough that finding nothing would mean something', async () => {

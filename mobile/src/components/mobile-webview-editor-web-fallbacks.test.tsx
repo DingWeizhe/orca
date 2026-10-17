@@ -83,9 +83,9 @@ vi.mock('react-native-webview', async () => {
   }
 })
 
-import { MobileHtmlPreview, MOBILE_HTML_PREVIEW_SANDBOX } from './MobileHtmlPreview.web'
+import { MobileHtmlPreview, MOBILE_HTML_PREVIEW_SANDBOX } from './MobileHtmlPreview'
 import { MobileHtmlPreview as PhoneHtmlPreview } from './MobileHtmlPreview'
-import { MobileRichMarkdownEditor } from './MobileRichMarkdownEditor.web'
+import { MobileRichMarkdownEditor } from './MobileRichMarkdownEditor'
 
 const renderers: ReactTestRenderer[] = []
 
