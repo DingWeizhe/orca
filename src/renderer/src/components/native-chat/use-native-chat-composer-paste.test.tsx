@@ -198,6 +198,7 @@ beforeEach(() => {
 afterEach(() => {
   root?.unmount()
   root = null
+  vi.restoreAllMocks()
   vi.clearAllMocks()
 })
 
@@ -823,6 +824,28 @@ describe('file-manager copies', () => {
         expect(insertTypedText).not.toHaveBeenCalled()
         // The copied file itself is attached, never the bitmap rendition beside it.
         expect(mocks.saveClipboardImageAsTempFile).not.toHaveBeenCalled()
+      }
+    )
+
+    it.each([
+      ['macOS', 'Macintosh', false],
+      ['other platforms', 'X11; Linux x86_64', true]
+    ])(
+      'on %s, treats a screenshot picture beside its saved file as files only off macOS',
+      async (_label, platform, attachesFiles) => {
+        // A screenshot tool's clipboard: the picture plus its saved file, which may be gone.
+        vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(`Mozilla/5.0 (${platform})`)
+        mocks.readClipboardText.mockResolvedValue('')
+        mocks.readClipboardFilePaths.mockResolvedValue(['/Users/me/Desktop/Screenshot.png'])
+        mocks.saveClipboardImageAsTempFile.mockResolvedValue('/tmp/shot.png')
+        const attachCopiedFiles = vi.fn()
+        const probe = await renderProbe({
+          resolveAttachmentOwner: () => ({ kind: 'local' }),
+          attachCopiedFiles
+        })
+        await act(async () => probe.latest().pasteFromClipboard())
+        expect(attachCopiedFiles).toHaveBeenCalledTimes(attachesFiles ? 1 : 0)
+        expect(mocks.saveClipboardImageAsTempFile).toHaveBeenCalledTimes(attachesFiles ? 0 : 1)
       }
     )
 

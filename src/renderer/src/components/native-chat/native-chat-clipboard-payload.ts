@@ -1,3 +1,5 @@
+import { isMacPlatform } from './native-chat-shortcut'
+
 /** Minimal shape shared by React's synthetic ClipboardEvent and the native DOM
  *  ClipboardEvent — the pane-level listener delivers the native one. */
 export type ClipboardEventLike = {
@@ -102,5 +104,13 @@ export async function readClipboardPasteText(
     // Without the file list the text is typed as-is.
     window.api.ui.readClipboardFilePaths().catch(() => [])
   ])
-  return { text, copiedFilePaths: copiesOnlyFiles(text, filePaths) ? filePaths : [] }
+  if (!copiesOnlyFiles(text, filePaths)) {
+    return { text, copiedFilePaths: [] }
+  }
+  // macOS lists a screenshot tool's saved file beside its picture; only a Finder copy also names it.
+  const picture =
+    text === '' &&
+    isMacPlatform() &&
+    (await window.api.ui.clipboardHasImage().catch(() => false)) === true
+  return { text, copiedFilePaths: picture ? [] : filePaths }
 }
