@@ -68,7 +68,7 @@ async function send(text: string): Promise<string> {
 
 /** The send as the newest frame that carried it told the subscriber. */
 function lastPublished(clientMessageId: string): AgentJournalSubmission | undefined {
-  for (const event of [...events].reverse()) {
+  for (const event of events.toReversed()) {
     const submissions =
       event.type === 'batch'
         ? event.batch.submissions
